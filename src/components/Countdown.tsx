@@ -1,0 +1,67 @@
+import { motion, AnimatePresence } from 'framer-motion';
+
+interface CountdownProps {
+  secondsRemaining: number;
+  isVisible: boolean;
+  sectionName: string;
+}
+
+export function Countdown({ secondsRemaining, isVisible, sectionName }: CountdownProps) {
+  const minutes = Math.floor(secondsRemaining / 60);
+  const seconds = secondsRemaining % 60;
+  const isUrgent = secondsRemaining <= 60;
+
+  const formatNumber = (n: number) => n.toString().padStart(2, '0');
+
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -20, scale: 0.95 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="glass-panel p-6 md:p-8"
+        >
+          <div className="text-center">
+            <motion.p 
+              className="text-muted-foreground text-sm md:text-base uppercase tracking-widest mb-2"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              {sectionName} ends in
+            </motion.p>
+            
+            <motion.div 
+              className={`font-mono font-bold text-5xl md:text-7xl ${
+                isUrgent ? 'text-destructive' : 'text-warning'
+              }`}
+              animate={isUrgent ? { scale: [1, 1.02, 1] } : {}}
+              transition={{ duration: 0.5, repeat: Infinity }}
+            >
+              {formatNumber(minutes)}:{formatNumber(seconds)}
+            </motion.div>
+
+            {isUrgent && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-4 flex items-center justify-center gap-2"
+              >
+                <motion.div
+                  className="w-3 h-3 rounded-full bg-destructive"
+                  animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                />
+                <span className="text-destructive font-medium uppercase tracking-wider text-sm">
+                  Final Minute
+                </span>
+              </motion.div>
+            )}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

@@ -9,27 +9,43 @@ import {
   Schedule, 
   initializeSchedules, 
   getScheduleByDay, 
-  getCurrentDaySchedule 
+  getScheduleById,
+  getAllSchedules,
+  getCurrentDaySchedule,
+  formatTime12Hour,
 } from '@/lib/scheduleStore';
 import { useScheduleTimer } from '@/hooks/useScheduleTimer';
 import { Bell } from 'lucide-react';
 
 const Index = () => {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [showEditor, setShowEditor] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  const timerState = useScheduleTimer(schedule);
+  const timerState = useScheduleTimer(schedule, isMuted);
 
   // Initialize schedules and load appropriate day
   useEffect(() => {
     const init = async () => {
       await initializeSchedules();
       
+      const allSchedules = await getAllSchedules();
+      setSchedules(allSchedules);
+      
       // Get current day or default to Tuesday for demo
-      const currentDay = getCurrentDaySchedule() || 'tuesday';
-      const daySchedule = await getScheduleByDay(currentDay);
+      const currentDay = getCurrentDaySchedule();
+      let daySchedule: Schedule | undefined;
+      
+      if (currentDay) {
+        daySchedule = await getScheduleByDay(currentDay);
+      }
+      
+      // If no day-based schedule found, use the first one
+      if (!daySchedule && allSchedules.length > 0) {
+        daySchedule = allSchedules[0];
+      }
       
       if (daySchedule) {
         setSchedule(daySchedule);
@@ -40,13 +56,39 @@ const Index = () => {
     init();
   }, []);
 
-  // Reload schedule when editor closes
+  const handleScheduleChange = async (scheduleId: string) => {
+    const selected = await getScheduleById(scheduleId);
+    if (selected) {
+      setSchedule(selected);
+    }
+  };
+
+  // Reload schedules when editor closes
   const handleEditorClose = async () => {
     setShowEditor(false);
-    const currentDay = getCurrentDaySchedule() || 'tuesday';
-    const daySchedule = await getScheduleByDay(currentDay);
-    if (daySchedule) {
-      setSchedule(daySchedule);
+    const allSchedules = await getAllSchedules();
+    setSchedules(allSchedules);
+    
+    // Reload current schedule in case it was modified
+    if (schedule) {
+      const updated = await getScheduleById(schedule.id);
+      if (updated) {
+        setSchedule(updated);
+      } else {
+        // Schedule was deleted, pick another one
+        const currentDay = getCurrentDaySchedule();
+        let newSchedule: Schedule | undefined;
+        
+        if (currentDay) {
+          newSchedule = await getScheduleByDay(currentDay);
+        }
+        
+        if (!newSchedule && allSchedules.length > 0) {
+          newSchedule = allSchedules[0];
+        }
+        
+        setSchedule(newSchedule || null);
+      }
     }
   };
 
@@ -70,7 +112,9 @@ const Index = () => {
       
       {/* Header */}
       <Header
-        scheduleName={schedule?.displayName || 'Loading...'}
+        schedules={schedules}
+        currentSchedule={schedule}
+        onScheduleChange={handleScheduleChange}
         onSettingsClick={() => setShowEditor(true)}
         isMuted={isMuted}
         onMuteToggle={() => setIsMuted(!isMuted)}
@@ -128,7 +172,7 @@ const Index = () => {
             >
               <p className="text-muted-foreground text-lg">
                 {timerState.nextSection 
-                  ? `Class starts at ${schedule.sections[0].startTime}`
+                  ? `Class starts at ${formatTime12Hour(schedule.sections[0].startTime)}`
                   : 'Class has ended'
                 }
               </p>
@@ -150,7 +194,12 @@ const Index = () => {
 
       {/* Schedule Editor */}
       <AnimatePresence>
-        {showEditor && <ScheduleEditor onClose={handleEditorClose} />}
+        {showEditor && (
+          <ScheduleEditor 
+            onClose={handleEditorClose} 
+            currentScheduleId={schedule?.id}
+          />
+        )}
       </AnimatePresence>
 
       {/* Click hint for audio */}

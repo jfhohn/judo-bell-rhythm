@@ -1,15 +1,26 @@
 import { motion } from 'framer-motion';
-import { Settings, Volume2, VolumeX } from 'lucide-react';
+import { Settings, Volume2, VolumeX, ChevronDown } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Schedule } from '@/lib/scheduleStore';
 import svjLogo from '@/assets/svj-logo.png';
 
 interface HeaderProps {
-  scheduleName: string;
+  schedules: Schedule[];
+  currentSchedule: Schedule | null;
+  onScheduleChange: (scheduleId: string) => void;
   onSettingsClick: () => void;
   isMuted: boolean;
   onMuteToggle: () => void;
 }
 
-export function Header({ scheduleName, onSettingsClick, isMuted, onMuteToggle }: HeaderProps) {
+export function Header({ 
+  schedules, 
+  currentSchedule, 
+  onScheduleChange, 
+  onSettingsClick, 
+  isMuted, 
+  onMuteToggle 
+}: HeaderProps) {
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -25,7 +36,18 @@ export function Header({ scheduleName, onSettingsClick, isMuted, onMuteToggle }:
           />
           <div>
             <h1 className="text-lg md:text-xl font-bold text-foreground">SchoolBell</h1>
-            <p className="text-xs md:text-sm text-muted-foreground">{scheduleName}</p>
+            <Select value={currentSchedule?.id || ''} onValueChange={onScheduleChange}>
+              <SelectTrigger className="h-auto p-0 border-0 bg-transparent text-xs md:text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <SelectValue placeholder="Select schedule" />
+              </SelectTrigger>
+              <SelectContent>
+                {schedules.map(schedule => (
+                  <SelectItem key={schedule.id} value={schedule.id}>
+                    {schedule.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

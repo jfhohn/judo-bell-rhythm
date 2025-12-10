@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Schedule, Section, timeToMinutes, getCurrentTimeMinutes } from '@/lib/scheduleStore';
-import { audioSystem } from '@/lib/audioSystem';
+import { Schedule, Section, timeToMinutes } from '@/lib/scheduleStore';
+import { audioSystem, BellSound } from '@/lib/audioSystem';
 
 export interface TimerState {
   currentTime: Date;
@@ -8,24 +8,32 @@ export interface TimerState {
   nextSection: Section | null;
   secondsRemaining: number;
   isWarningPhase: boolean;
+  isTwoMinuteWarning: boolean;
   isClassActive: boolean;
   classProgress: number;
 }
 
-export function useScheduleTimer(schedule: Schedule | null) {
+export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = false) {
   const [state, setState] = useState<TimerState>({
     currentTime: new Date(),
     currentSection: null,
     nextSection: null,
     secondsRemaining: 0,
     isWarningPhase: false,
+    isTwoMinuteWarning: false,
     isClassActive: false,
     classProgress: 0,
   });
 
   const warningPlayedRef = useRef<string | null>(null);
+  const twoMinWarningPlayedRef = useRef<string | null>(null);
   const bellPlayedRef = useRef<string | null>(null);
   const audioInitializedRef = useRef(false);
+
+  // Sync mute state with audio system
+  useEffect(() => {
+    audioSystem.setMuted(isMuted);
+  }, [isMuted]);
 
   const initAudio = useCallback(async () => {
     if (!audioInitializedRef.current) {
@@ -36,7 +44,6 @@ export function useScheduleTimer(schedule: Schedule | null) {
   }, []);
 
   useEffect(() => {
-    // Initialize audio on first user interaction
     const handleInteraction = () => {
       initAudio();
       window.removeEventListener('click', handleInteraction);
@@ -61,7 +68,6 @@ export function useScheduleTimer(schedule: Schedule | null) {
       const currentSeconds = now.getSeconds();
       const totalCurrentSeconds = currentMinutes * 60 + currentSeconds;
 
-      // Find current and next sections
       let currentSection: Section | null = null;
       let nextSection: Section | null = null;
       
@@ -80,33 +86,35 @@ export function useScheduleTimer(schedule: Schedule | null) {
         }
       }
 
-      // Calculate seconds remaining in current section
       let secondsRemaining = 0;
       let isWarningPhase = false;
+      let isTwoMinuteWarning = false;
 
       if (currentSection) {
         const endMinutes = timeToMinutes(currentSection.endTime);
         const endSeconds = endMinutes * 60;
         secondsRemaining = endSeconds - totalCurrentSeconds;
-        isWarningPhase = secondsRemaining <= 300 && secondsRemaining > 0; // 5 minutes = 300 seconds
+        isWarningPhase = secondsRemaining <= 300 && secondsRemaining > 0;
+        isTwoMinuteWarning = secondsRemaining <= 120 && secondsRemaining > 0;
 
-        // Play warning sound at exactly 5 minutes remaining (once)
+        // Play 5-minute warning sound
         if (secondsRemaining <= 300 && secondsRemaining > 295 && warningPlayedRef.current !== currentSection.id) {
           warningPlayedRef.current = currentSection.id;
           audioSystem.playWarning();
         }
 
-        // Play bell at section end
+        // Play 2-minute warning sound if enabled for this section
+        if (currentSection.playTwoMinWarning && secondsRemaining <= 120 && secondsRemaining > 115 && twoMinWarningPlayedRef.current !== currentSection.id) {
+          twoMinWarningPlayedRef.current = currentSection.id;
+          audioSystem.playTwoMinuteWarning();
+        }
+
+        // Play bell at section end if enabled
         if (secondsRemaining <= 0 && bellPlayedRef.current !== currentSection.id) {
           bellPlayedRef.current = currentSection.id;
-          audioSystem.playBell();
-        }
-      }
-
-      // Reset refs when section changes
-      if (!currentSection || currentSection.id !== warningPlayedRef.current?.split('-')[0]) {
-        if (currentSection && warningPlayedRef.current !== currentSection.id) {
-          // Don't reset if we're still in the same section
+          if (currentSection.playEndBell) {
+            audioSystem.playBell(currentSection.bellSound as BellSound);
+          }
         }
       }
 
@@ -127,15 +135,13 @@ export function useScheduleTimer(schedule: Schedule | null) {
         nextSection,
         secondsRemaining: Math.max(0, secondsRemaining),
         isWarningPhase,
+        isTwoMinuteWarning,
         isClassActive,
         classProgress,
       });
     };
 
-    // Update immediately
     updateTimer();
-
-    // Update every second
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);

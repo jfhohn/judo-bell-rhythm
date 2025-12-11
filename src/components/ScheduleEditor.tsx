@@ -22,7 +22,6 @@ import {
   DAY_OPTIONS,
   DayOfWeek,
   resetToDefaults,
-  exportCurrentDataAsDefaults,
 } from '@/lib/scheduleStore';
 import { audioSystem, BELL_SOUNDS, BellSound } from '@/lib/audioSystem';
 import { toast } from 'sonner';
@@ -77,22 +76,12 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
   };
 
   const handleResetToDefaults = async () => {
-    console.log('Reset to defaults clicked');
     if (!confirm('This will delete all your current schedules and restore defaults. Continue?')) {
-      console.log('Reset cancelled by user');
       return;
     }
-    console.log('Calling resetToDefaults...');
     await resetToDefaults();
-    console.log('resetToDefaults completed, reloading data...');
     await loadData();
-    console.log('Data reloaded');
     toast.success('Schedules reset to defaults');
-  };
-
-  const handleExportAsDefaults = async () => {
-    await exportCurrentDataAsDefaults();
-    toast.success('Data exported to console - check browser dev tools');
   };
 
   const activeSchedule = schedules.find(s => s.id === activeScheduleId);
@@ -328,9 +317,6 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl md:text-3xl font-bold">Schedule Editor</h2>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportAsDefaults}>
-              Export as Defaults
-            </Button>
             {groups.length === 0 && (
               <Button variant="outline" onClick={handleResetToDefaults}>
                 Reset to Defaults

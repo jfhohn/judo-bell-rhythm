@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.0.3] - 2024-12-11
+
+### Changed
+- **Updated Default Schedules**: New default schedules match SVJ's actual class structure
+  - Standard group: Tuesday, Thursday, Saturday with full class timings
+  - Tournament Prep group: Comp schedules with more randori-focused structure
+- **Bell Sounds**: Default to "Boxing" warning bell and "Loud School Bell" end bell
+- **Cleaned up debug code**: Removed console.log statements and dev-only export function
+
 ## [3.0.2] - 2024-12-11
 
 ### Added

@@ -304,7 +304,7 @@ const Index = () => {
                   if (currentMinutes < startMinutes) {
                     return `Class has not begun — starts at ${formatTime12Hour(schedule.sections[0].startTime)}`;
                   } else if (currentMinutes >= endMinutes) {
-                    return 'Class has ended';
+                    return 'Waiting for next class to start';
                   }
                   return '';
                 })()}

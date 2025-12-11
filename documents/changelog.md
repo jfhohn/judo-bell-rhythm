@@ -1,17 +1,55 @@
 # Changelog
 
-## [2.1.0] - 2024-12-11
-
-### Fixed
-- Group deletion now persists correctly to IndexedDB (was only updating local state)
-- "Class has not begun" message now displays when schedule is loaded but class hasn't started
+## [3.0.0] - 2024-12-11
 
 ### Added
-- Auto-switch to next schedule when current class ends (within same active group)
-- Smart schedule selection based on current time: finds in-progress or next upcoming class
+- **Schedule Groups**: Organize schedules into named groups (e.g., "Standard", "Tournament Prep", "Judo Clinic")
+- **Group-Level Active State**: Active state now managed at GROUP level, not individual schedules
+- **Auto-Switch on Group Change**: Selecting a group on main screen automatically sets it as active
+- **Smart Schedule Selection**: Auto-loads best schedule based on active group, day-of-week, and current time
+- **Auto-Advance to Next Class**: When current class ends, automatically switches to next schedule in active group
+- **Empty Group State**: Visual UI with "Add Schedule" CTA when group has no schedules
+- **Group Deletion**: Delete groups with confirmation dialog warning about contained schedules
+- **Duration-Based Time Entry**: Define sections by duration; start/end times auto-calculated
+- **Schedule-Level Bell Configuration**: Warning and End bells configured per-schedule, not per-section
+- **Red Flashing Clock**: Clock display flashes red during final 2 minutes of any section
+- **Current Section Progress Bar**: Simplified progress display showing only current section (0-100%)
 
 ### Changed
-- Improved schedule auto-load logic to consider current time, not just day of week
+- **Visual Warning System**:
+  - 5-minute warning: Visual only (yellow flash) - NO audio
+  - 2-minute warning: Visual (red flash) + audio bell
+- Active group shows checkmark indicator in dropdowns
+- Inactive groups appear dimmed in schedule editor
+- Removed per-section bell sound configuration (now schedule-level)
+- "Class has not begun" / "Class has ended" messages when outside schedule times
+
+### Fixed
+- End bell now triggers reliably (widened trigger window to 5 seconds)
+- 2-minute warning bell plays correctly during live timer
+- Group deletion persists to IndexedDB
+- Audio context properly resumes for bell playback
+
+## [2.0.0] - 2024-12-11
+
+### Added
+- Schedule groups for organizing multiple schedules
+- Active/inactive schedule states with single-active enforcement
+- Duration-based time entry (auto-calculates start/end times)
+- Day-of-week assignment per schedule
+- Differentiated warning bell vs end bell sounds
+- Red flashing clock animation in final 2 minutes
+- Current section progress bar (replaced full timeline)
+- Schedule-level bell sound configuration
+
+### Changed
+- Simplified UI: removed section list, showing only current section progress
+- Bell sounds now configured at schedule level, not per-section
+- Auto-load priority: Active + matching day → Active + "any" → Active → Day match → First
+
+### Fixed
+- Critical: Audio bells now play correctly during live timer (fixed audio context resume)
+- Section end bell timing improved with transition detection
 
 ## [2.0.0] - 2024-12-11
 

@@ -134,8 +134,8 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
           audioSystem.playTwoMinuteWarning(schedule.warningBellSound);
         }
 
-        // Play bell at section end if enabled - trigger in final seconds
-        if (currentSection.playEndBell && secondsRemaining <= 2 && secondsRemaining >= 0 && bellPlayedRef.current !== currentSection.id) {
+        // Play bell at section end if enabled - trigger in final 5 seconds for reliability
+        if (currentSection.playEndBell && secondsRemaining <= 5 && secondsRemaining >= 0 && bellPlayedRef.current !== currentSection.id) {
           bellPlayedRef.current = currentSection.id;
           await audioSystem.resume();
           audioSystem.playBell(schedule.endBellSound as BellSound);

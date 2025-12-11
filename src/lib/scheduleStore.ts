@@ -275,30 +275,19 @@ export async function initializeSchedules(): Promise<void> {
 }
 
 export async function resetToDefaults(): Promise<void> {
-  console.log('resetToDefaults: starting...');
   try {
-    // Force a fresh connection by clearing the cached promise
-    console.log('resetToDefaults: about to clear dbPromise');
     dbPromise = null;
-    console.log('resetToDefaults: cleared db cache, calling getDB...');
-    
     const db = await getDB();
-    console.log('resetToDefaults: got fresh db');
     
-    // Clear all stores using clear() for efficiency
     const tx = db.transaction(['groups', 'schedules', 'meta'], 'readwrite');
-    console.log('resetToDefaults: clearing stores...');
     await Promise.all([
       tx.objectStore('groups').clear(),
       tx.objectStore('schedules').clear(),
       tx.objectStore('meta').clear(),
     ]);
     await tx.done;
-    console.log('resetToDefaults: stores cleared');
     
-    // Create defaults in a new transaction
     const tx2 = db.transaction(['groups', 'schedules'], 'readwrite');
-    console.log('resetToDefaults: creating defaults...');
     for (const group of defaultGroups) {
       tx2.objectStore('groups').put(group);
     }
@@ -306,26 +295,10 @@ export async function resetToDefaults(): Promise<void> {
       tx2.objectStore('schedules').put(schedule);
     }
     await tx2.done;
-    console.log('resetToDefaults: complete');
   } catch (error) {
-    console.error('resetToDefaults: error', error);
+    console.error('resetToDefaults error:', error);
     throw error;
   }
-}
-
-// Export current data as JSON for copying defaults
-export async function exportCurrentDataAsDefaults(): Promise<void> {
-  const db = await getDB();
-  const groups = await db.getAll('groups');
-  const schedules = await db.getAll('schedules');
-  
-  console.log('=== COPY THIS FOR NEW DEFAULTS ===');
-  console.log('// Default groups');
-  console.log('const defaultGroups: ScheduleGroup[] = ' + JSON.stringify(groups, null, 2) + ';');
-  console.log('');
-  console.log('// Default schedules');
-  console.log('const defaultSchedules: Schedule[] = ' + JSON.stringify(schedules, null, 2) + ';');
-  console.log('=== END DEFAULTS ===');
 }
 
 export async function getAllGroups(): Promise<ScheduleGroup[]> {

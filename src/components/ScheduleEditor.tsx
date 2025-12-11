@@ -16,7 +16,7 @@ import {
   saveGroup,
   deleteSchedule,
   deleteGroup,
-  setActiveSchedule,
+  setActiveGroup,
   recalculateSectionTimes,
   formatTime12Hour,
   DAY_OPTIONS,
@@ -132,14 +132,7 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
     }
   };
 
-  const handleSetActive = async (scheduleId: string) => {
-    // Update local state
-    setSchedules(prev => prev.map(s => ({
-      ...s,
-      isActive: s.id === scheduleId
-    })));
-    setHasChanges(true);
-  };
+  // Remove individual schedule active logic - now handled at group level
 
   const duplicateSchedule = () => {
     if (!activeSchedule) return;
@@ -178,6 +171,7 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
     const newGroup: ScheduleGroup = {
       id: Date.now().toString(),
       name: newGroupName.trim(),
+      isActive: false,
       scheduleIds: [],
     };
     
@@ -185,6 +179,59 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
     setNewGroupName('');
     setHasChanges(true);
     toast.success('Group created');
+  };
+
+  const handleSetActiveGroup = (groupId: string) => {
+    setGroups(prev => prev.map(g => ({
+      ...g,
+      isActive: g.id === groupId
+    })));
+    setHasChanges(true);
+    toast.success('Group set as active');
+  };
+
+  const handleDeleteGroup = async (groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+    
+    const groupScheduleCount = schedules.filter(s => s.groupId === groupId).length;
+    
+    if (groups.length <= 1) {
+      toast.error('Cannot delete the last group');
+      return;
+    }
+    
+    const confirmMessage = groupScheduleCount > 0 
+      ? `Delete "${group.name}" and its ${groupScheduleCount} schedule(s)?`
+      : `Delete "${group.name}"?`;
+    
+    if (!window.confirm(confirmMessage)) return;
+    
+    // If deleting active group, activate first remaining group
+    if (group.isActive) {
+      const remainingGroups = groups.filter(g => g.id !== groupId);
+      if (remainingGroups.length > 0) {
+        setGroups(prev => prev.map(g => 
+          g.id === remainingGroups[0].id ? { ...g, isActive: true } : g
+        ).filter(g => g.id !== groupId));
+      }
+    } else {
+      setGroups(prev => prev.filter(g => g.id !== groupId));
+    }
+    
+    // Remove schedules in this group
+    setSchedules(prev => prev.filter(s => s.groupId !== groupId));
+    
+    // Switch to another group
+    const remainingGroups = groups.filter(g => g.id !== groupId);
+    if (remainingGroups.length > 0) {
+      setActiveGroupId(remainingGroups[0].id);
+      const firstInGroup = schedules.find(s => s.groupId === remainingGroups[0].id);
+      if (firstInGroup) setActiveScheduleId(firstInGroup.id);
+    }
+    
+    setHasChanges(true);
+    toast.success('Group deleted');
   };
 
   const createScheduleInGroup = () => {
@@ -215,10 +262,10 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
     for (const group of groups) {
       await saveGroup(group);
     }
-    // Update active schedule in DB
-    const activeOne = schedules.find(s => s.isActive);
-    if (activeOne) {
-      await setActiveSchedule(activeOne.id);
+    // Update active group in DB
+    const activeGroup = groups.find(g => g.isActive);
+    if (activeGroup) {
+      await setActiveGroup(activeGroup.id);
     }
     setHasChanges(false);
     toast.success('Schedules saved successfully');
@@ -263,26 +310,60 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
         <div className="mb-6">
           <Label className="text-sm text-muted-foreground mb-2 block">Schedule Group</Label>
           <div className="flex flex-wrap gap-2 mb-3">
-            {groups.map(group => (
-              <button
-                key={group.id}
-                onClick={() => {
-                  setActiveGroupId(group.id);
-                  const firstInGroup = schedules.find(s => s.groupId === group.id);
-                  if (firstInGroup) setActiveScheduleId(firstInGroup.id);
-                }}
-                className={`
-                  px-4 py-2 rounded-lg font-medium transition-all text-sm
-                  ${activeGroupId === group.id 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                  }
-                `}
-              >
-                {group.name}
-              </button>
-            ))}
+            {groups.map(group => {
+              const isCurrentGroup = activeGroupId === group.id;
+              return (
+                <div key={group.id} className="relative group/item">
+                  <button
+                    onClick={() => {
+                      setActiveGroupId(group.id);
+                      const firstInGroup = schedules.find(s => s.groupId === group.id);
+                      if (firstInGroup) setActiveScheduleId(firstInGroup.id);
+                    }}
+                    className={`
+                      px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2
+                      ${isCurrentGroup
+                        ? 'bg-primary text-primary-foreground' 
+                        : group.isActive
+                        ? 'bg-primary/20 text-primary border border-primary/40'
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      }
+                    `}
+                  >
+                    {group.isActive && <Check className="w-3 h-3" />}
+                    {group.name}
+                  </button>
+                </div>
+              );
+            })}
           </div>
+          
+          {/* Group actions */}
+          <div className="flex flex-wrap gap-2 mb-3">
+            {groups.find(g => g.id === activeGroupId) && !groups.find(g => g.id === activeGroupId)?.isActive && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleSetActiveGroup(activeGroupId)}
+                className="gap-2"
+              >
+                <Check className="w-4 h-4" />
+                Set Group as Active
+              </Button>
+            )}
+            {groups.length > 1 && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleDeleteGroup(activeGroupId)}
+                className="gap-2 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Group
+              </Button>
+            )}
+          </div>
+
           <div className="flex gap-2">
             <Input
               placeholder="New group name..."
@@ -298,58 +379,63 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
           </div>
         </div>
 
-        {/* Schedule selector within group */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          {groupSchedules.map(schedule => (
-            <button
-              key={schedule.id}
-              onClick={() => setActiveScheduleId(schedule.id)}
-              className={`
-                px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2
-                ${activeScheduleId === schedule.id 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }
-              `}
-            >
-              {schedule.isActive && <Check className="w-3 h-3" />}
-              {schedule.name}
-            </button>
-          ))}
-          <Button variant="outline" size="sm" onClick={createScheduleInGroup} className="gap-1">
-            <Plus className="w-4 h-4" />
-            New Schedule
-          </Button>
-        </div>
-
-        {/* Schedule actions */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <Button variant="outline" size="sm" onClick={duplicateSchedule} className="gap-2">
-            <Copy className="w-4 h-4" />
-            Duplicate
-          </Button>
-          {activeSchedule && !activeSchedule.isActive && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => handleSetActive(activeSchedule.id)}
-              className="gap-2"
-            >
-              <Check className="w-4 h-4" />
-              Set as Active
+        {/* Empty group state */}
+        {groupSchedules.length === 0 ? (
+          <div className="glass-panel p-8 mb-6 flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+              <Plus className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">No schedules in this group</h3>
+            <p className="text-muted-foreground mb-4">Create your first schedule to get started</p>
+            <Button onClick={createScheduleInGroup} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Add Schedule
             </Button>
-          )}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleDeleteSchedule}
-            className="gap-2 text-destructive hover:text-destructive"
-            disabled={schedules.length <= 1}
-          >
-            <Trash2 className="w-4 h-4" />
-            Delete Schedule
-          </Button>
-        </div>
+          </div>
+        ) : (
+          <>
+            {/* Schedule selector within group */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {groupSchedules.map(schedule => (
+                <button
+                  key={schedule.id}
+                  onClick={() => setActiveScheduleId(schedule.id)}
+                  className={`
+                    px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2
+                    ${activeScheduleId === schedule.id 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    }
+                  `}
+                >
+                  {schedule.name}
+                </button>
+              ))}
+              <Button variant="outline" size="sm" onClick={createScheduleInGroup} className="gap-1">
+                <Plus className="w-4 h-4" />
+                New Schedule
+              </Button>
+            </div>
+
+            {/* Schedule actions */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              <Button variant="outline" size="sm" onClick={duplicateSchedule} className="gap-2">
+                <Copy className="w-4 h-4" />
+                Duplicate
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleDeleteSchedule}
+                className="gap-2 text-destructive hover:text-destructive"
+                disabled={schedules.length <= 1}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Schedule
+              </Button>
+            </div>
+          </>
+        )}
 
         {activeSchedule && (
           <>
@@ -391,16 +477,9 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
                 </Select>
               </div>
               <div>
-                <Label className="text-sm text-muted-foreground mb-2 block">
-                  {activeSchedule.isActive && <span className="text-primary font-medium">(Active) </span>}
-                  Status
-                </Label>
-                <div className="h-10 flex items-center">
-                  {activeSchedule.isActive ? (
-                    <span className="text-primary font-medium">Currently Active Schedule</span>
-                  ) : (
-                    <span className="text-muted-foreground">Not active</span>
-                  )}
+                <Label className="text-sm text-muted-foreground mb-2 block">Day Assignment</Label>
+                <div className="h-10 flex items-center text-sm text-muted-foreground">
+                  Auto-loads on assigned day within the active group
                 </div>
               </div>
             </div>
@@ -408,9 +487,10 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
             {/* Bell sound settings */}
             <div className="glass-panel p-4 mb-6">
               <h3 className="font-semibold mb-4">Bell Sounds</h3>
+              <p className="text-xs text-muted-foreground mb-4">5-minute warning is visual only (yellow). 2-minute warning plays the bell sound below.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm text-muted-foreground mb-2 block">Warning Bell (5-min & 2-min)</Label>
+                  <Label className="text-sm text-muted-foreground mb-2 block">2-Minute Warning Bell</Label>
                   <div className="flex gap-2">
                     <Select 
                       value={activeSchedule.warningBellSound} 

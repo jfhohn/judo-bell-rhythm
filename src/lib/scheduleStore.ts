@@ -15,6 +15,7 @@ export interface Section {
 export interface ScheduleGroup {
   id: string;
   name: string;
+  isActive: boolean;
   scheduleIds: string[];
 }
 
@@ -117,8 +118,8 @@ function getDB() {
 
 // Default groups
 const defaultGroups: ScheduleGroup[] = [
-  { id: 'standard', name: 'Standard', scheduleIds: ['tuesday', 'thursday', 'saturday'] },
-  { id: 'tournament', name: 'Tournament', scheduleIds: ['tournament'] },
+  { id: 'standard', name: 'Standard', isActive: true, scheduleIds: ['tuesday', 'thursday', 'saturday'] },
+  { id: 'tournament', name: 'Tournament', isActive: false, scheduleIds: ['tournament'] },
 ];
 
 // Default schedules for SVJ
@@ -231,7 +232,33 @@ export async function saveGroup(group: ScheduleGroup): Promise<void> {
 
 export async function deleteGroup(id: string): Promise<void> {
   const db = await getDB();
+  // Also delete all schedules in this group
+  const schedules = await db.getAll('schedules');
+  for (const schedule of schedules) {
+    if (schedule.groupId === id) {
+      await db.delete('schedules', schedule.id);
+    }
+  }
   await db.delete('groups', id);
+}
+
+export async function getActiveGroup(): Promise<ScheduleGroup | undefined> {
+  const db = await getDB();
+  const allGroups = await db.getAll('groups');
+  return allGroups.find(g => g.isActive);
+}
+
+export async function setActiveGroup(groupId: string): Promise<void> {
+  const db = await getDB();
+  const allGroups = await db.getAll('groups');
+  
+  // Deactivate all, activate the specified one
+  for (const group of allGroups) {
+    const isActive = group.id === groupId;
+    if (group.isActive !== isActive) {
+      await db.put('groups', { ...group, isActive });
+    }
+  }
 }
 
 export async function getSchedulesByGroup(groupId: string): Promise<Schedule[]> {

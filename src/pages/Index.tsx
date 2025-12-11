@@ -9,16 +9,17 @@ import {
   Schedule,
   ScheduleGroup,
   initializeSchedules, 
-  getScheduleByDay, 
   getScheduleById,
   getAllSchedules,
   getAllGroups,
-  getActiveSchedule,
+  getActiveGroup,
+  setActiveGroup,
   getCurrentDaySchedule,
   formatTime12Hour,
 } from '@/lib/scheduleStore';
 import { useScheduleTimer } from '@/hooks/useScheduleTimer';
 import { Bell } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Index = () => {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
@@ -44,41 +45,34 @@ const Index = () => {
       setSchedules(allSchedules);
       setGroups(allGroups);
       
-      // Priority: Active schedule matching today > Active with "any" day > Active schedule > First schedule
+      // Find active group
+      const activeGroup = allGroups.find(g => g.isActive) || allGroups[0];
+      setCurrentGroup(activeGroup);
+      
+      // Get schedules in the active group
+      const groupSchedules = allSchedules.filter(s => s.groupId === activeGroup?.id);
+      
+      // Priority: Schedule matching today's day > Schedule with "any" day > First in group
       const currentDay = getCurrentDaySchedule();
       let selectedSchedule: Schedule | undefined;
       
-      // 1. Try active schedule matching today
+      // 1. Try schedule matching today in active group
       if (currentDay) {
-        selectedSchedule = allSchedules.find(s => s.isActive && s.dayOfWeek === currentDay);
+        selectedSchedule = groupSchedules.find(s => s.dayOfWeek === currentDay);
       }
       
-      // 2. Try active schedule with "any" day
+      // 2. Try schedule with "any" day in active group
       if (!selectedSchedule) {
-        selectedSchedule = allSchedules.find(s => s.isActive && s.dayOfWeek === 'any');
+        selectedSchedule = groupSchedules.find(s => s.dayOfWeek === 'any');
       }
       
-      // 3. Try any active schedule
-      if (!selectedSchedule) {
-        selectedSchedule = allSchedules.find(s => s.isActive);
-      }
-      
-      // 4. Try schedule matching today's day
-      if (!selectedSchedule && currentDay) {
-        selectedSchedule = allSchedules.find(s => s.dayOfWeek === currentDay);
-      }
-      
-      // 5. Fall back to first schedule
-      if (!selectedSchedule && allSchedules.length > 0) {
-        selectedSchedule = allSchedules[0];
+      // 3. Fall back to first schedule in group
+      if (!selectedSchedule && groupSchedules.length > 0) {
+        selectedSchedule = groupSchedules[0];
       }
       
       if (selectedSchedule) {
         setSchedule(selectedSchedule);
-        const group = allGroups.find(g => g.id === selectedSchedule!.groupId);
-        setCurrentGroup(group || allGroups[0]);
-      } else if (allGroups.length > 0) {
-        setCurrentGroup(allGroups[0]);
       }
       
       setInitialized(true);
@@ -87,15 +81,36 @@ const Index = () => {
     init();
   }, []);
 
-  const handleGroupChange = (groupId: string) => {
+  const handleGroupChange = async (groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (group) {
-      setCurrentGroup(group);
-      // Select first schedule in group
-      const firstInGroup = schedules.find(s => s.groupId === groupId);
-      if (firstInGroup) {
-        setSchedule(firstInGroup);
+      // Auto-activate the group when switching
+      await setActiveGroup(groupId);
+      
+      // Update local state
+      setGroups(prev => prev.map(g => ({
+        ...g,
+        isActive: g.id === groupId
+      })));
+      setCurrentGroup({ ...group, isActive: true });
+      
+      // Find appropriate schedule in the new group
+      const groupSchedules = schedules.filter(s => s.groupId === groupId);
+      const currentDay = getCurrentDaySchedule();
+      
+      let selectedSchedule = currentDay 
+        ? groupSchedules.find(s => s.dayOfWeek === currentDay) 
+        : undefined;
+      
+      if (!selectedSchedule) {
+        selectedSchedule = groupSchedules.find(s => s.dayOfWeek === 'any') || groupSchedules[0];
       }
+      
+      if (selectedSchedule) {
+        setSchedule(selectedSchedule);
+      }
+      
+      toast.success(`Switched to ${group.name}`);
     }
   };
 
@@ -116,24 +131,29 @@ const Index = () => {
     setSchedules(allSchedules);
     setGroups(allGroups);
     
-    // Reload current schedule in case it was modified
+    // Find and set the active group
+    const activeGroup = allGroups.find(g => g.isActive) || allGroups[0];
+    setCurrentGroup(activeGroup);
+    
+    // Reload current schedule if it still exists, otherwise pick from active group
     if (schedule) {
       const updated = await getScheduleById(schedule.id);
       if (updated) {
         setSchedule(updated);
-        const group = allGroups.find(g => g.id === updated.groupId);
-        if (group) setCurrentGroup(group);
       } else {
-        // Schedule was deleted, pick the active one or first
-        const active = await getActiveSchedule();
-        if (active) {
-          setSchedule(active);
-          const group = allGroups.find(g => g.id === active.groupId);
-          if (group) setCurrentGroup(group);
-        } else if (allSchedules.length > 0) {
-          setSchedule(allSchedules[0]);
-          const group = allGroups.find(g => g.id === allSchedules[0].groupId);
-          if (group) setCurrentGroup(group);
+        // Schedule was deleted, pick from active group
+        const groupSchedules = allSchedules.filter(s => s.groupId === activeGroup?.id);
+        const currentDay = getCurrentDaySchedule();
+        let selectedSchedule = currentDay 
+          ? groupSchedules.find(s => s.dayOfWeek === currentDay) 
+          : undefined;
+        
+        if (!selectedSchedule) {
+          selectedSchedule = groupSchedules[0];
+        }
+        
+        if (selectedSchedule) {
+          setSchedule(selectedSchedule);
         }
       }
     }

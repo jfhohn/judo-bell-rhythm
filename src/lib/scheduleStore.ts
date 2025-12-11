@@ -265,6 +265,21 @@ export async function resetToDefaults(): Promise<void> {
   }
 }
 
+// Export current data as JSON for copying defaults
+export async function exportCurrentDataAsDefaults(): Promise<void> {
+  const db = await getDB();
+  const groups = await db.getAll('groups');
+  const schedules = await db.getAll('schedules');
+  
+  console.log('=== COPY THIS FOR NEW DEFAULTS ===');
+  console.log('// Default groups');
+  console.log('const defaultGroups: ScheduleGroup[] = ' + JSON.stringify(groups, null, 2) + ';');
+  console.log('');
+  console.log('// Default schedules');
+  console.log('const defaultSchedules: Schedule[] = ' + JSON.stringify(schedules, null, 2) + ';');
+  console.log('=== END DEFAULTS ===');
+}
+
 export async function getAllGroups(): Promise<ScheduleGroup[]> {
   const db = await getDB();
   return db.getAll('groups');

@@ -318,7 +318,11 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
                     onClick={() => {
                       setActiveGroupId(group.id);
                       const firstInGroup = schedules.find(s => s.groupId === group.id);
-                      if (firstInGroup) setActiveScheduleId(firstInGroup.id);
+                      if (firstInGroup) {
+                        setActiveScheduleId(firstInGroup.id);
+                      } else {
+                        setActiveScheduleId(''); // Clear when switching to empty group
+                      }
                     }}
                     className={`
                       px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2
@@ -437,7 +441,7 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
           </>
         )}
 
-        {activeSchedule && (
+        {activeSchedule && activeSchedule.groupId === activeGroupId && (
           <>
             {/* Schedule settings */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

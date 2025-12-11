@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.0.1] - 2024-12-11
+
+### Fixed
+- **Schedule persistence**: User changes (deletions, edits) now persist correctly after refresh. Added initialization flag to prevent default schedules from being re-created.
+- **Empty group display**: Switching to a group with no schedules now correctly shows empty state instead of stale schedule data from previous selection.
+
 ## [3.0.0] - 2024-12-11
 
 ### Added

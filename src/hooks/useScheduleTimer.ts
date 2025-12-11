@@ -142,7 +142,7 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
         // Play bell at section end if enabled - trigger in final 5 seconds for reliability
         if (
           currentSection.playEndBell &&
-          secondsRemaining <= 2 &&
+          secondsRemaining <= 3 &&
           secondsRemaining >= 0 &&
           bellPlayedRef.current !== currentSection.id
         ) {

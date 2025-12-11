@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Schedule, Section, timeToMinutes } from '@/lib/scheduleStore';
-import { audioSystem, BellSound } from '@/lib/audioSystem';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Schedule, Section, timeToMinutes } from "@/lib/scheduleStore";
+import { audioSystem, BellSound } from "@/lib/audioSystem";
 
 export interface TimerState {
   currentTime: Date;
@@ -49,16 +49,16 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
   useEffect(() => {
     const handleInteraction = () => {
       initAudio();
-      window.removeEventListener('click', handleInteraction);
-      window.removeEventListener('keydown', handleInteraction);
+      window.removeEventListener("click", handleInteraction);
+      window.removeEventListener("keydown", handleInteraction);
     };
-    
-    window.addEventListener('click', handleInteraction);
-    window.addEventListener('keydown', handleInteraction);
-    
+
+    window.addEventListener("click", handleInteraction);
+    window.addEventListener("keydown", handleInteraction);
+
     return () => {
-      window.removeEventListener('click', handleInteraction);
-      window.removeEventListener('keydown', handleInteraction);
+      window.removeEventListener("click", handleInteraction);
+      window.removeEventListener("keydown", handleInteraction);
     };
   }, [initAudio]);
 
@@ -78,12 +78,12 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
 
       let currentSection: Section | null = null;
       let nextSection: Section | null = null;
-      
+
       for (let i = 0; i < schedule.sections.length; i++) {
         const section = schedule.sections[i];
         const startMinutes = timeToMinutes(section.startTime);
         const endMinutes = timeToMinutes(section.endTime);
-        
+
         // Use <= for end time to include the exact end moment for bell triggering
         if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
           currentSection = section;
@@ -128,14 +128,24 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
 
         // Play 2-minute warning sound if enabled for this section
         // Widen the time window to ensure we catch it
-        if (currentSection.playTwoMinWarning && secondsRemaining <= 120 && secondsRemaining > 117 && twoMinWarningPlayedRef.current !== currentSection.id) {
+        if (
+          currentSection.playTwoMinWarning &&
+          secondsRemaining <= 120 &&
+          secondsRemaining > 117 &&
+          twoMinWarningPlayedRef.current !== currentSection.id
+        ) {
           twoMinWarningPlayedRef.current = currentSection.id;
           await audioSystem.resume();
           audioSystem.playTwoMinuteWarning(schedule.warningBellSound);
         }
 
         // Play bell at section end if enabled - trigger in final 5 seconds for reliability
-        if (currentSection.playEndBell && secondsRemaining <= 5 && secondsRemaining >= 0 && bellPlayedRef.current !== currentSection.id) {
+        if (
+          currentSection.playEndBell &&
+          secondsRemaining <= 2 &&
+          secondsRemaining >= 0 &&
+          bellPlayedRef.current !== currentSection.id
+        ) {
           bellPlayedRef.current = currentSection.id;
           await audioSystem.resume();
           audioSystem.playBell(schedule.endBellSound as BellSound);

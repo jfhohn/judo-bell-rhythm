@@ -21,6 +21,7 @@ import {
   formatTime12Hour,
   DAY_OPTIONS,
   DayOfWeek,
+  resetToDefaults,
 } from '@/lib/scheduleStore';
 import { audioSystem, BELL_SOUNDS, BellSound } from '@/lib/audioSystem';
 import { toast } from 'sonner';
@@ -48,18 +49,40 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
   const [newGroupName, setNewGroupName] = useState('');
 
   useEffect(() => {
-    Promise.all([getAllSchedules(), getAllGroups()]).then(([loadedSchedules, loadedGroups]) => {
-      setSchedules(loadedSchedules);
-      setGroups(loadedGroups);
-      if (currentScheduleId) {
-        setActiveScheduleId(currentScheduleId);
-        const schedule = loadedSchedules.find(s => s.id === currentScheduleId);
-        if (schedule) {
-          setActiveGroupId(schedule.groupId);
-        }
-      }
-    });
+    loadData();
   }, [currentScheduleId]);
+
+  const loadData = async () => {
+    const [loadedSchedules, loadedGroups] = await Promise.all([getAllSchedules(), getAllGroups()]);
+    setSchedules(loadedSchedules);
+    setGroups(loadedGroups);
+    
+    if (currentScheduleId) {
+      setActiveScheduleId(currentScheduleId);
+      const schedule = loadedSchedules.find(s => s.id === currentScheduleId);
+      if (schedule) {
+        setActiveGroupId(schedule.groupId);
+      }
+    } else if (loadedGroups.length > 0) {
+      // Set to first group if none selected
+      setActiveGroupId(loadedGroups[0].id);
+      const firstSchedule = loadedSchedules.find(s => s.groupId === loadedGroups[0].id);
+      if (firstSchedule) {
+        setActiveScheduleId(firstSchedule.id);
+      } else {
+        setActiveScheduleId('');
+      }
+    }
+  };
+
+  const handleResetToDefaults = async () => {
+    if (!confirm('This will delete all your current schedules and restore defaults. Continue?')) {
+      return;
+    }
+    await resetToDefaults();
+    await loadData();
+    toast.success('Schedules reset to defaults');
+  };
 
   const activeSchedule = schedules.find(s => s.id === activeScheduleId);
   const groupSchedules = schedules.filter(s => s.groupId === activeGroupId);
@@ -294,6 +317,11 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl md:text-3xl font-bold">Schedule Editor</h2>
           <div className="flex gap-2">
+            {groups.length === 0 && (
+              <Button variant="outline" onClick={handleResetToDefaults}>
+                Reset to Defaults
+              </Button>
+            )}
             {hasChanges && (
               <Button onClick={handleSave} className="gap-2">
                 <Save className="w-4 h-4" />
@@ -309,82 +337,96 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
         {/* Group selector */}
         <div className="mb-6">
           <Label className="text-sm text-muted-foreground mb-2 block">Schedule Group</Label>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {groups.map(group => {
-              const isCurrentGroup = activeGroupId === group.id;
-              return (
-                <div key={group.id} className="relative group/item">
-                  <button
-                    onClick={() => {
-                      setActiveGroupId(group.id);
-                      const firstInGroup = schedules.find(s => s.groupId === group.id);
-                      if (firstInGroup) {
-                        setActiveScheduleId(firstInGroup.id);
-                      } else {
-                        setActiveScheduleId(''); // Clear when switching to empty group
-                      }
-                    }}
-                    className={`
-                      px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2
-                      ${isCurrentGroup
-                        ? 'bg-primary text-primary-foreground' 
-                        : group.isActive
-                        ? 'bg-primary/20 text-primary border border-primary/40'
-                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                      }
-                    `}
-                  >
-                    {group.isActive && <Check className="w-3 h-3" />}
-                    {group.name}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
           
-          {/* Group actions */}
-          <div className="flex flex-wrap gap-2 mb-3">
-            {groups.find(g => g.id === activeGroupId) && !groups.find(g => g.id === activeGroupId)?.isActive && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleSetActiveGroup(activeGroupId)}
-                className="gap-2"
-              >
-                <Check className="w-4 h-4" />
-                Set Group as Active
+          {groups.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="mb-4">No schedule groups found.</p>
+              <Button onClick={handleResetToDefaults}>
+                Reset to Defaults
               </Button>
-            )}
-            {groups.length > 1 && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleDeleteGroup(activeGroupId)}
-                className="gap-2 text-destructive hover:text-destructive"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Group
-              </Button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {groups.map(group => {
+                const isCurrentGroup = activeGroupId === group.id;
+                return (
+                  <div key={group.id} className="relative group/item">
+                    <button
+                      onClick={() => {
+                        setActiveGroupId(group.id);
+                        const firstInGroup = schedules.find(s => s.groupId === group.id);
+                        if (firstInGroup) {
+                          setActiveScheduleId(firstInGroup.id);
+                        } else {
+                          setActiveScheduleId(''); // Clear when switching to empty group
+                        }
+                      }}
+                      className={`
+                        px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2
+                        ${isCurrentGroup
+                          ? 'bg-primary text-primary-foreground' 
+                          : group.isActive
+                          ? 'bg-primary/20 text-primary border border-primary/40'
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                        }
+                      `}
+                    >
+                      {group.isActive && <Check className="w-3 h-3" />}
+                      {group.name}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          {groups.length > 0 && (
+            <>
+              {/* Group actions */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {groups.find(g => g.id === activeGroupId) && !groups.find(g => g.id === activeGroupId)?.isActive && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleSetActiveGroup(activeGroupId)}
+                    className="gap-2"
+                  >
+                    <Check className="w-4 h-4" />
+                    Set Group as Active
+                  </Button>
+                )}
+                {groups.length > 1 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleDeleteGroup(activeGroupId)}
+                    className="gap-2 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Group
+                  </Button>
+                )}
+              </div>
 
-          <div className="flex gap-2">
-            <Input
-              placeholder="New group name..."
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              className="max-w-xs bg-background/50"
-              onKeyDown={(e) => e.key === 'Enter' && addNewGroup()}
-            />
-            <Button variant="outline" size="sm" onClick={addNewGroup} disabled={!newGroupName.trim()}>
-              <Plus className="w-4 h-4 mr-1" />
-              Add Group
-            </Button>
-          </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="New group name..."
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  className="max-w-xs bg-background/50"
+                  onKeyDown={(e) => e.key === 'Enter' && addNewGroup()}
+                />
+                <Button variant="outline" size="sm" onClick={addNewGroup} disabled={!newGroupName.trim()}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Group
+                </Button>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Empty group state */}
-        {groupSchedules.length === 0 ? (
+        {/* Empty group state - only show if groups exist but current group has no schedules */}
+        {groups.length > 0 && groupSchedules.length === 0 ? (
           <div className="glass-panel p-8 mb-6 flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
               <Plus className="w-8 h-8 text-muted-foreground" />
@@ -396,7 +438,7 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
               Add Schedule
             </Button>
           </div>
-        ) : (
+        ) : groups.length > 0 && (
           <>
             {/* Schedule selector within group */}
             <div className="flex flex-wrap gap-2 mb-4">

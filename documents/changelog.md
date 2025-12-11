@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.0.2] - 2024-12-11
+
+### Added
+- **New Bell Sounds**: Added "Loud School Bell" and "Boxing Bell" MP3-based sounds for warning and end bells
+- **Reset to Defaults**: Button to restore default schedules when all data is deleted
+
+### Fixed
+- **Empty schedule editor**: Fixed issue where deleting all schedules left editor unusable. Now auto-creates defaults when both groups and schedules are empty
+- **Save button functionality**: Fixed save not working when groups were empty by properly handling empty state
+
 ## [3.0.1] - 2024-12-11
 
 ### Fixed

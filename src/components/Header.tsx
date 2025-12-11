@@ -52,7 +52,10 @@ export function Header({
                 <SelectContent>
                   {groups.map(group => (
                     <SelectItem key={group.id} value={group.id}>
-                      {group.name}
+                      <span className="flex items-center gap-2">
+                        {group.isActive && <Check className="w-3 h-3 text-primary" />}
+                        {group.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -65,10 +68,7 @@ export function Header({
                 <SelectContent>
                   {groupSchedules.map(schedule => (
                     <SelectItem key={schedule.id} value={schedule.id}>
-                      <span className="flex items-center gap-2">
-                        {schedule.isActive && <Check className="w-3 h-3 text-primary" />}
-                        {schedule.name}
-                      </span>
+                      {schedule.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

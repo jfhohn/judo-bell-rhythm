@@ -119,15 +119,16 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
         const elapsedSectionSeconds = totalCurrentSeconds - startSeconds;
         sectionProgress = Math.max(0, Math.min(100, (elapsedSectionSeconds / totalSectionSeconds) * 100));
 
-        // Play 5-minute warning sound
+        // 5-minute warning - VISUAL ONLY (no audio)
+        // Track that we've entered warning phase for this section
         if (secondsRemaining <= 300 && secondsRemaining > 295 && warningPlayedRef.current !== currentSection.id) {
           warningPlayedRef.current = currentSection.id;
-          await audioSystem.resume();
-          audioSystem.playWarning(schedule.warningBellSound);
+          // No audio at 5-minute mark per requirements
         }
 
         // Play 2-minute warning sound if enabled for this section
-        if (currentSection.playTwoMinWarning && secondsRemaining <= 120 && secondsRemaining > 115 && twoMinWarningPlayedRef.current !== currentSection.id) {
+        // Widen the time window to ensure we catch it
+        if (currentSection.playTwoMinWarning && secondsRemaining <= 120 && secondsRemaining > 117 && twoMinWarningPlayedRef.current !== currentSection.id) {
           twoMinWarningPlayedRef.current = currentSection.id;
           await audioSystem.resume();
           audioSystem.playTwoMinuteWarning(schedule.warningBellSound);

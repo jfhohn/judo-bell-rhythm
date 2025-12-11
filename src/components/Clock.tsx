@@ -14,24 +14,32 @@ export function Clock({ time, isWarning, isUrgent, isTwoMinuteWarning }: ClockPr
   const [timePart, period] = timeString.split(' ');
   const [hours, minutes, seconds] = timePart.split(':');
 
-  const colorClass = isUrgent 
-    ? 'text-destructive' 
-    : isTwoMinuteWarning
+  // Color classes: red for 2-min warning, yellow for 5-min warning
+  const colorClass = isTwoMinuteWarning
     ? 'text-destructive'
+    : isUrgent 
+    ? 'text-destructive' 
     : isWarning 
     ? 'text-warning' 
     : 'text-foreground';
 
-  // Red flashing animation for final 2 minutes
+  // Animations: red flashing for 2-min, yellow pulsing for 5-min
   const flashAnimation = isTwoMinuteWarning ? {
     opacity: [1, 0.4, 1],
     scale: [1, 1.02, 1],
+  } : isWarning && !isTwoMinuteWarning ? {
+    opacity: [1, 0.7, 1],
+    scale: [1, 1.01, 1],
   } : isUrgent ? {
     scale: [1, 1.01, 1],
   } : {};
 
   const flashTransition = isTwoMinuteWarning ? {
     duration: 0.8,
+    repeat: Infinity,
+    ease: 'easeInOut' as const,
+  } : isWarning && !isTwoMinuteWarning ? {
+    duration: 1.2,
     repeat: Infinity,
     ease: 'easeInOut' as const,
   } : isUrgent ? {

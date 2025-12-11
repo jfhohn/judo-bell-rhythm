@@ -43,10 +43,14 @@ interface SchoolBellDB extends DBSchema {
     key: string;
     value: ScheduleGroup;
   };
+  meta: {
+    key: string;
+    value: { key: string; value: boolean };
+  };
 }
 
 const DB_NAME = 'judo-schoolbell';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase<SchoolBellDB>> | null = null;
 
@@ -98,6 +102,11 @@ function getDB() {
         if (oldVersion < 3) {
           if (!db.objectStoreNames.contains('groups')) {
             db.createObjectStore('groups', { keyPath: 'id' });
+          }
+        }
+        if (oldVersion < 4) {
+          if (!db.objectStoreNames.contains('meta')) {
+            db.createObjectStore('meta', { keyPath: 'key' });
           }
         }
         // Migration: update existing schedules
@@ -198,21 +207,33 @@ const defaultSchedules: Schedule[] = [
 export async function initializeSchedules(): Promise<void> {
   const db = await getDB();
   
-  // Initialize groups
-  for (const group of defaultGroups) {
-    const existing = await db.get('groups', group.id);
-    if (!existing) {
-      await db.put('groups', group);
-    }
+  // Check if already initialized - only create defaults on first-ever run
+  const initialized = await db.get('meta', 'initialized');
+  if (initialized?.value) {
+    return; // Skip - user has already set up their schedules
   }
   
-  // Initialize schedules
-  for (const schedule of defaultSchedules) {
-    const existing = await db.get('schedules', schedule.id);
-    if (!existing) {
-      await db.put('schedules', schedule);
-    }
+  // Check if user already has data (existing users before this update)
+  const existingGroups = await db.getAll('groups');
+  const existingSchedules = await db.getAll('schedules');
+  
+  if (existingGroups.length > 0 || existingSchedules.length > 0) {
+    // User already has data - don't recreate defaults, just mark as initialized
+    await db.put('meta', { key: 'initialized', value: true });
+    return;
   }
+  
+  // Fresh install - create defaults
+  for (const group of defaultGroups) {
+    await db.put('groups', group);
+  }
+  
+  for (const schedule of defaultSchedules) {
+    await db.put('schedules', schedule);
+  }
+  
+  // Mark as initialized so defaults are never re-created
+  await db.put('meta', { key: 'initialized', value: true });
 }
 
 export async function getAllGroups(): Promise<ScheduleGroup[]> {

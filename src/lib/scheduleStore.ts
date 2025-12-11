@@ -228,30 +228,36 @@ export async function initializeSchedules(): Promise<void> {
 
 export async function resetToDefaults(): Promise<void> {
   console.log('resetToDefaults: starting...');
-  const db = await getDB();
-  
-  // Clear existing data
-  const existingGroups = await db.getAll('groups');
-  const existingSchedules = await db.getAll('schedules');
-  console.log('resetToDefaults: clearing', existingGroups.length, 'groups and', existingSchedules.length, 'schedules');
-  
-  for (const group of existingGroups) {
-    await db.delete('groups', group.id);
+  try {
+    const db = await getDB();
+    console.log('resetToDefaults: got db');
+    
+    // Clear all stores using clear() for efficiency
+    const tx = db.transaction(['groups', 'schedules', 'meta'], 'readwrite');
+    console.log('resetToDefaults: clearing stores...');
+    await Promise.all([
+      tx.objectStore('groups').clear(),
+      tx.objectStore('schedules').clear(),
+      tx.objectStore('meta').clear(),
+    ]);
+    await tx.done;
+    console.log('resetToDefaults: stores cleared');
+    
+    // Create defaults in a new transaction
+    const tx2 = db.transaction(['groups', 'schedules'], 'readwrite');
+    console.log('resetToDefaults: creating defaults...');
+    for (const group of defaultGroups) {
+      tx2.objectStore('groups').put(group);
+    }
+    for (const schedule of defaultSchedules) {
+      tx2.objectStore('schedules').put(schedule);
+    }
+    await tx2.done;
+    console.log('resetToDefaults: complete');
+  } catch (error) {
+    console.error('resetToDefaults: error', error);
+    throw error;
   }
-  for (const schedule of existingSchedules) {
-    await db.delete('schedules', schedule.id);
-  }
-  
-  // Create defaults
-  console.log('resetToDefaults: creating', defaultGroups.length, 'default groups and', defaultSchedules.length, 'default schedules');
-  for (const group of defaultGroups) {
-    await db.put('groups', group);
-  }
-  
-  for (const schedule of defaultSchedules) {
-    await db.put('schedules', schedule);
-  }
-  console.log('resetToDefaults: complete');
 }
 
 export async function getAllGroups(): Promise<ScheduleGroup[]> {

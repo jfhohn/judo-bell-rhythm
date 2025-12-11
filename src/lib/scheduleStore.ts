@@ -227,11 +227,13 @@ export async function initializeSchedules(): Promise<void> {
 }
 
 export async function resetToDefaults(): Promise<void> {
+  console.log('resetToDefaults: starting...');
   const db = await getDB();
   
   // Clear existing data
   const existingGroups = await db.getAll('groups');
   const existingSchedules = await db.getAll('schedules');
+  console.log('resetToDefaults: clearing', existingGroups.length, 'groups and', existingSchedules.length, 'schedules');
   
   for (const group of existingGroups) {
     await db.delete('groups', group.id);
@@ -241,6 +243,7 @@ export async function resetToDefaults(): Promise<void> {
   }
   
   // Create defaults
+  console.log('resetToDefaults: creating', defaultGroups.length, 'default groups and', defaultSchedules.length, 'default schedules');
   for (const group of defaultGroups) {
     await db.put('groups', group);
   }
@@ -248,6 +251,7 @@ export async function resetToDefaults(): Promise<void> {
   for (const schedule of defaultSchedules) {
     await db.put('schedules', schedule);
   }
+  console.log('resetToDefaults: complete');
 }
 
 export async function getAllGroups(): Promise<ScheduleGroup[]> {

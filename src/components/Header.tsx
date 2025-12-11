@@ -1,12 +1,15 @@
 import { motion } from 'framer-motion';
-import { Settings, Volume2, VolumeX, ChevronDown } from 'lucide-react';
+import { Settings, Volume2, VolumeX, Check } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Schedule } from '@/lib/scheduleStore';
+import { Schedule, ScheduleGroup } from '@/lib/scheduleStore';
 import svjLogo from '@/assets/svj-logo.png';
 
 interface HeaderProps {
+  groups: ScheduleGroup[];
   schedules: Schedule[];
+  currentGroup: ScheduleGroup | null;
   currentSchedule: Schedule | null;
+  onGroupChange: (groupId: string) => void;
   onScheduleChange: (scheduleId: string) => void;
   onSettingsClick: () => void;
   isMuted: boolean;
@@ -14,13 +17,18 @@ interface HeaderProps {
 }
 
 export function Header({ 
-  schedules, 
+  groups,
+  schedules,
+  currentGroup,
   currentSchedule, 
+  onGroupChange,
   onScheduleChange, 
   onSettingsClick, 
   isMuted, 
   onMuteToggle 
 }: HeaderProps) {
+  const groupSchedules = schedules.filter(s => s.groupId === currentGroup?.id);
+
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -36,18 +44,36 @@ export function Header({
           />
           <div>
             <h1 className="text-lg md:text-xl font-bold text-foreground">SchoolBell</h1>
-            <Select value={currentSchedule?.id || ''} onValueChange={onScheduleChange}>
-              <SelectTrigger className="h-auto p-0 border-0 bg-transparent text-xs md:text-sm text-muted-foreground hover:text-foreground transition-colors">
-                <SelectValue placeholder="Select schedule" />
-              </SelectTrigger>
-              <SelectContent>
-                {schedules.map(schedule => (
-                  <SelectItem key={schedule.id} value={schedule.id}>
-                    {schedule.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={currentGroup?.id || ''} onValueChange={onGroupChange}>
+                <SelectTrigger className="h-auto p-0 border-0 bg-transparent text-xs md:text-sm text-muted-foreground hover:text-foreground transition-colors w-auto min-w-0">
+                  <SelectValue placeholder="Select group" />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map(group => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-muted-foreground/50">›</span>
+              <Select value={currentSchedule?.id || ''} onValueChange={onScheduleChange}>
+                <SelectTrigger className="h-auto p-0 border-0 bg-transparent text-xs md:text-sm text-muted-foreground hover:text-foreground transition-colors w-auto min-w-0">
+                  <SelectValue placeholder="Select schedule" />
+                </SelectTrigger>
+                <SelectContent>
+                  {groupSchedules.map(schedule => (
+                    <SelectItem key={schedule.id} value={schedule.id}>
+                      <span className="flex items-center gap-2">
+                        {schedule.isActive && <Check className="w-3 h-3 text-primary" />}
+                        {schedule.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 

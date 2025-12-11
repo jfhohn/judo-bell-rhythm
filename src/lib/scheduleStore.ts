@@ -1,21 +1,35 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { BellSound } from './audioSystem';
 
 export interface Section {
   id: string;
   name: string;
   startTime: string; // HH:MM format
   endTime: string;   // HH:MM format
+  durationMinutes: number;
   color: string;
   playEndBell: boolean;
   playTwoMinWarning: boolean;
-  bellSound: string;
 }
+
+export interface ScheduleGroup {
+  id: string;
+  name: string;
+  scheduleIds: string[];
+}
+
+export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'any';
 
 export interface Schedule {
   id: string;
   name: string;
   scheduleType: 'class' | 'tournament' | 'custom';
-  associatedDays?: string[];
+  groupId: string;
+  isActive: boolean;
+  dayOfWeek?: DayOfWeek;
+  classStartTime: string; // HH:MM format - start time for the whole schedule
+  warningBellSound: BellSound;
+  endBellSound: BellSound;
   sections: Section[];
 }
 
@@ -24,23 +38,52 @@ interface SchoolBellDB extends DBSchema {
     key: string;
     value: Schedule;
   };
+  groups: {
+    key: string;
+    value: ScheduleGroup;
+  };
 }
 
 const DB_NAME = 'judo-schoolbell';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<SchoolBellDB>> | null = null;
 
-function migrateSection(section: any): Section {
+function migrateSection(section: any, index: number, sections: any[]): Section {
+  // Calculate duration from start/end times if not present
+  let durationMinutes = section.durationMinutes;
+  if (!durationMinutes && section.startTime && section.endTime) {
+    const start = timeToMinutes(section.startTime);
+    const end = timeToMinutes(section.endTime);
+    durationMinutes = end - start;
+  }
+  
   return {
     id: section.id,
     name: section.name,
     startTime: section.startTime,
     endTime: section.endTime,
+    durationMinutes: durationMinutes || 15,
     color: section.color,
     playEndBell: section.playEndBell ?? !section.name.toLowerCase().includes('break'),
     playTwoMinWarning: section.playTwoMinWarning ?? false,
-    bellSound: section.bellSound ?? 'classic',
+  };
+}
+
+function migrateSchedule(schedule: any): Schedule {
+  const sections = schedule.sections.map((s: any, i: number, arr: any[]) => migrateSection(s, i, arr));
+  
+  return {
+    id: schedule.id,
+    name: schedule.name || schedule.displayName || schedule.id,
+    scheduleType: schedule.scheduleType || 'class',
+    groupId: schedule.groupId || 'standard',
+    isActive: schedule.isActive ?? false,
+    dayOfWeek: schedule.dayOfWeek || (schedule.associatedDays?.[0] as DayOfWeek) || undefined,
+    classStartTime: schedule.classStartTime || sections[0]?.startTime || '18:00',
+    warningBellSound: schedule.warningBellSound || 'classic',
+    endBellSound: schedule.endBellSound || schedule.sections?.[0]?.bellSound || 'classic',
+    sections,
   };
 }
 
@@ -51,18 +94,17 @@ function getDB() {
         if (oldVersion < 1) {
           db.createObjectStore('schedules', { keyPath: 'id' });
         }
-        // Migration from v1 to v2: update existing schedules
-        if (oldVersion === 1 && newVersion === 2) {
+        if (oldVersion < 3) {
+          if (!db.objectStoreNames.contains('groups')) {
+            db.createObjectStore('groups', { keyPath: 'id' });
+          }
+        }
+        // Migration: update existing schedules
+        if (oldVersion < 3 && oldVersion >= 1) {
           const store = transaction.objectStore('schedules');
           store.getAll().then(schedules => {
             schedules.forEach(schedule => {
-              const migrated: Schedule = {
-                id: schedule.id,
-                name: schedule.name || (schedule as any).displayName || schedule.id,
-                scheduleType: (schedule as any).scheduleType || 'class',
-                associatedDays: (schedule as any).associatedDays || [(schedule as any).day],
-                sections: schedule.sections.map(migrateSection),
-              };
+              const migrated = migrateSchedule(schedule);
               store.put(migrated);
             });
           });
@@ -73,55 +115,81 @@ function getDB() {
   return dbPromise;
 }
 
+// Default groups
+const defaultGroups: ScheduleGroup[] = [
+  { id: 'standard', name: 'Standard', scheduleIds: ['tuesday', 'thursday', 'saturday'] },
+  { id: 'tournament', name: 'Tournament', scheduleIds: ['tournament'] },
+];
+
 // Default schedules for SVJ
 const defaultSchedules: Schedule[] = [
   {
     id: 'tuesday',
     name: 'Tuesday Class',
     scheduleType: 'class',
-    associatedDays: ['tuesday'],
+    groupId: 'standard',
+    isActive: true,
+    dayOfWeek: 'tuesday',
+    classStartTime: '18:30',
+    warningBellSound: 'classic',
+    endBellSound: 'classic',
     sections: [
-      { id: '1', name: 'Warmup', startTime: '18:30', endTime: '18:45', color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '2', name: 'Newaza', startTime: '18:45', endTime: '19:15', color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '3', name: 'Tachiwaza', startTime: '19:15', endTime: '19:45', color: 'hsl(280 70% 50%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '4', name: 'Randori', startTime: '19:45', endTime: '20:15', color: 'hsl(38 92% 50%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
+      { id: '1', name: 'Warmup', startTime: '18:30', endTime: '18:45', durationMinutes: 15, color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false },
+      { id: '2', name: 'Newaza', startTime: '18:45', endTime: '19:15', durationMinutes: 30, color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: false },
+      { id: '3', name: 'Tachiwaza', startTime: '19:15', endTime: '19:45', durationMinutes: 30, color: 'hsl(280 70% 50%)', playEndBell: true, playTwoMinWarning: false },
+      { id: '4', name: 'Randori', startTime: '19:45', endTime: '20:15', durationMinutes: 30, color: 'hsl(38 92% 50%)', playEndBell: true, playTwoMinWarning: false },
     ],
   },
   {
     id: 'thursday',
     name: 'Thursday Class',
     scheduleType: 'class',
-    associatedDays: ['thursday'],
+    groupId: 'standard',
+    isActive: false,
+    dayOfWeek: 'thursday',
+    classStartTime: '18:30',
+    warningBellSound: 'classic',
+    endBellSound: 'classic',
     sections: [
-      { id: '1', name: 'Warmup', startTime: '18:30', endTime: '18:45', color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '2', name: 'Newaza', startTime: '18:45', endTime: '19:15', color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '3', name: 'Tachiwaza', startTime: '19:15', endTime: '19:45', color: 'hsl(280 70% 50%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '4', name: 'Randori', startTime: '19:45', endTime: '20:15', color: 'hsl(38 92% 50%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
+      { id: '1', name: 'Warmup', startTime: '18:30', endTime: '18:45', durationMinutes: 15, color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false },
+      { id: '2', name: 'Newaza', startTime: '18:45', endTime: '19:15', durationMinutes: 30, color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: false },
+      { id: '3', name: 'Tachiwaza', startTime: '19:15', endTime: '19:45', durationMinutes: 30, color: 'hsl(280 70% 50%)', playEndBell: true, playTwoMinWarning: false },
+      { id: '4', name: 'Randori', startTime: '19:45', endTime: '20:15', durationMinutes: 30, color: 'hsl(38 92% 50%)', playEndBell: true, playTwoMinWarning: false },
     ],
   },
   {
     id: 'saturday',
     name: 'Saturday Class',
     scheduleType: 'class',
-    associatedDays: ['saturday'],
+    groupId: 'standard',
+    isActive: false,
+    dayOfWeek: 'saturday',
+    classStartTime: '10:00',
+    warningBellSound: 'classic',
+    endBellSound: 'classic',
     sections: [
-      { id: '1', name: 'Warmup', startTime: '10:00', endTime: '10:15', color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '2', name: 'Newaza', startTime: '10:15', endTime: '10:45', color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '3', name: 'Tachiwaza', startTime: '10:45', endTime: '11:15', color: 'hsl(280 70% 50%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '4', name: 'Randori', startTime: '11:15', endTime: '12:00', color: 'hsl(38 92% 50%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
+      { id: '1', name: 'Warmup', startTime: '10:00', endTime: '10:15', durationMinutes: 15, color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false },
+      { id: '2', name: 'Newaza', startTime: '10:15', endTime: '10:45', durationMinutes: 30, color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: false },
+      { id: '3', name: 'Tachiwaza', startTime: '10:45', endTime: '11:15', durationMinutes: 30, color: 'hsl(280 70% 50%)', playEndBell: true, playTwoMinWarning: false },
+      { id: '4', name: 'Randori', startTime: '11:15', endTime: '12:00', durationMinutes: 45, color: 'hsl(38 92% 50%)', playEndBell: true, playTwoMinWarning: false },
     ],
   },
   {
     id: 'tournament',
     name: 'Tournament',
     scheduleType: 'tournament',
-    associatedDays: [],
+    groupId: 'tournament',
+    isActive: false,
+    dayOfWeek: undefined,
+    classStartTime: '09:00',
+    warningBellSound: 'gong',
+    endBellSound: 'gong',
     sections: [
-      { id: '1', name: 'Warmup', startTime: '09:00', endTime: '09:30', color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '2', name: 'Pool Matches', startTime: '09:30', endTime: '11:00', color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: true, bellSound: 'gong' },
-      { id: '3', name: 'Break', startTime: '11:00', endTime: '11:15', color: 'hsl(0 0% 50%)', playEndBell: false, playTwoMinWarning: false, bellSound: 'classic' },
-      { id: '4', name: 'Eliminations', startTime: '11:15', endTime: '12:30', color: 'hsl(280 70% 50%)', playEndBell: true, playTwoMinWarning: true, bellSound: 'gong' },
-      { id: '5', name: 'Finals', startTime: '12:30', endTime: '13:30', color: 'hsl(38 92% 50%)', playEndBell: true, playTwoMinWarning: true, bellSound: 'gong' },
+      { id: '1', name: 'Warmup', startTime: '09:00', endTime: '09:30', durationMinutes: 30, color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false },
+      { id: '2', name: 'Pool Matches', startTime: '09:30', endTime: '11:00', durationMinutes: 90, color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: true },
+      { id: '3', name: 'Break', startTime: '11:00', endTime: '11:15', durationMinutes: 15, color: 'hsl(0 0% 50%)', playEndBell: false, playTwoMinWarning: false },
+      { id: '4', name: 'Eliminations', startTime: '11:15', endTime: '12:30', durationMinutes: 75, color: 'hsl(280 70% 50%)', playEndBell: true, playTwoMinWarning: true },
+      { id: '5', name: 'Finals', startTime: '12:30', endTime: '13:30', durationMinutes: 60, color: 'hsl(38 92% 50%)', playEndBell: true, playTwoMinWarning: true },
     ],
   },
 ];
@@ -129,6 +197,15 @@ const defaultSchedules: Schedule[] = [
 export async function initializeSchedules(): Promise<void> {
   const db = await getDB();
   
+  // Initialize groups
+  for (const group of defaultGroups) {
+    const existing = await db.get('groups', group.id);
+    if (!existing) {
+      await db.put('groups', group);
+    }
+  }
+  
+  // Initialize schedules
   for (const schedule of defaultSchedules) {
     const existing = await db.get('schedules', schedule.id);
     if (!existing) {
@@ -137,10 +214,59 @@ export async function initializeSchedules(): Promise<void> {
   }
 }
 
+export async function getAllGroups(): Promise<ScheduleGroup[]> {
+  const db = await getDB();
+  return db.getAll('groups');
+}
+
+export async function getGroupById(id: string): Promise<ScheduleGroup | undefined> {
+  const db = await getDB();
+  return db.get('groups', id);
+}
+
+export async function saveGroup(group: ScheduleGroup): Promise<void> {
+  const db = await getDB();
+  await db.put('groups', group);
+}
+
+export async function deleteGroup(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('groups', id);
+}
+
+export async function getSchedulesByGroup(groupId: string): Promise<Schedule[]> {
+  const db = await getDB();
+  const allSchedules = await db.getAll('schedules');
+  return allSchedules.filter(s => s.groupId === groupId);
+}
+
 export async function getScheduleByDay(day: string): Promise<Schedule | undefined> {
   const db = await getDB();
   const allSchedules = await db.getAll('schedules');
-  return allSchedules.find(s => s.associatedDays?.includes(day));
+  // Prioritize active schedule matching day
+  const activeMatch = allSchedules.find(s => s.isActive && s.dayOfWeek === day);
+  if (activeMatch) return activeMatch;
+  // Fall back to any schedule matching day
+  return allSchedules.find(s => s.dayOfWeek === day);
+}
+
+export async function getActiveSchedule(): Promise<Schedule | undefined> {
+  const db = await getDB();
+  const allSchedules = await db.getAll('schedules');
+  return allSchedules.find(s => s.isActive);
+}
+
+export async function setActiveSchedule(scheduleId: string): Promise<void> {
+  const db = await getDB();
+  const allSchedules = await db.getAll('schedules');
+  
+  // Deactivate all, activate the specified one
+  for (const schedule of allSchedules) {
+    const isActive = schedule.id === scheduleId;
+    if (schedule.isActive !== isActive) {
+      await db.put('schedules', { ...schedule, isActive });
+    }
+  }
 }
 
 export async function getScheduleById(id: string): Promise<Schedule | undefined> {
@@ -163,14 +289,12 @@ export async function deleteSchedule(id: string): Promise<void> {
   await db.delete('schedules', id);
 }
 
-export function getCurrentDaySchedule(): string | null {
+export function getCurrentDaySchedule(): DayOfWeek | null {
   const day = new Date().getDay();
-  switch (day) {
-    case 2: return 'tuesday';
-    case 4: return 'thursday';
-    case 6: return 'saturday';
-    default: return null;
-  }
+  const days: (DayOfWeek | null)[] = [
+    'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'
+  ];
+  return days[day] || null;
 }
 
 export function timeToMinutes(time: string): number {
@@ -179,7 +303,7 @@ export function timeToMinutes(time: string): number {
 }
 
 export function minutesToTime(minutes: number): string {
-  const h = Math.floor(minutes / 60);
+  const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
@@ -204,3 +328,33 @@ export function formatTime12Hour(time24: string): string {
   const hours12 = hours % 12 || 12;
   return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
+
+// Recalculate section times based on class start time and durations
+export function recalculateSectionTimes(classStartTime: string, sections: Section[]): Section[] {
+  let currentMinutes = timeToMinutes(classStartTime);
+  
+  return sections.map(section => {
+    const startTime = minutesToTime(currentMinutes);
+    const endMinutes = currentMinutes + section.durationMinutes;
+    const endTime = minutesToTime(endMinutes);
+    currentMinutes = endMinutes;
+    
+    return {
+      ...section,
+      startTime,
+      endTime,
+    };
+  });
+}
+
+export const DAY_OPTIONS: { value: DayOfWeek | ''; label: string }[] = [
+  { value: '', label: 'No day assigned' },
+  { value: 'monday', label: 'Monday' },
+  { value: 'tuesday', label: 'Tuesday' },
+  { value: 'wednesday', label: 'Wednesday' },
+  { value: 'thursday', label: 'Thursday' },
+  { value: 'friday', label: 'Friday' },
+  { value: 'saturday', label: 'Saturday' },
+  { value: 'sunday', label: 'Sunday' },
+  { value: 'any', label: 'Any day' },
+];

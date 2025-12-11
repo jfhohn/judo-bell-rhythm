@@ -1,12 +1,14 @@
 // Web Audio API based sound system for reliable audio playback
 
-export type BellSound = 'classic' | 'school' | 'gong' | 'chime';
+export type BellSound = 'classic' | 'school' | 'gong' | 'chime' | 'schoolbell-loud' | 'boxing';
 
 export const BELL_SOUNDS: { id: BellSound; name: string }[] = [
   { id: 'classic', name: 'Classic Bell' },
   { id: 'school', name: 'School Bell' },
   { id: 'gong', name: 'Gong' },
   { id: 'chime', name: 'Chime' },
+  { id: 'schoolbell-loud', name: 'Loud School Bell' },
+  { id: 'boxing', name: 'Boxing Bell' },
 ];
 
 class AudioSystem {
@@ -62,6 +64,12 @@ class AudioSystem {
         break;
       case 'chime':
         this.playChime();
+        break;
+      case 'schoolbell-loud':
+        await this.playMP3('/sounds/schoolbell-loud.mp3');
+        break;
+      case 'boxing':
+        await this.playMP3('/sounds/boxing-bell.mp3');
         break;
       default:
         this.playClassicBell();
@@ -246,6 +254,14 @@ class AudioSystem {
         // Three ascending notes
         this.playSoftChime();
         break;
+      case 'schoolbell-loud':
+        // Play MP3 at lower volume for warning
+        this.playMP3('/sounds/schoolbell-loud.mp3', 0.3);
+        break;
+      case 'boxing':
+        // Play MP3 at lower volume for warning
+        this.playMP3('/sounds/boxing-bell.mp3', 0.4);
+        break;
       default:
         // Default ascending tones
         const notes = [392, 493.88, 587.33];
@@ -289,6 +305,12 @@ class AudioSystem {
           break;
         case 'chime':
           this.playSoftChime(offset);
+          break;
+        case 'schoolbell-loud':
+          if (i === 0) this.playMP3('/sounds/schoolbell-loud.mp3', 0.4);
+          break;
+        case 'boxing':
+          if (i === 0) this.playMP3('/sounds/boxing-bell.mp3', 0.5);
           break;
         default:
           const notes = [523.25, 659.25, 783.99];
@@ -383,6 +405,29 @@ class AudioSystem {
       osc.start(startTime);
       osc.stop(startTime + 0.5);
     });
+  }
+
+  // Play an MP3 file with optional volume control
+  private async playMP3(url: string, volume: number = 1.0): Promise<void> {
+    try {
+      const ctx = this.getContext();
+      const response = await fetch(url);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      
+      const source = ctx.createBufferSource();
+      const gainNode = ctx.createGain();
+      
+      source.buffer = audioBuffer;
+      gainNode.gain.value = volume;
+      
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      source.start(0);
+    } catch (error) {
+      console.error('Error playing MP3:', error);
+    }
   }
 
   // Play a soft tick sound

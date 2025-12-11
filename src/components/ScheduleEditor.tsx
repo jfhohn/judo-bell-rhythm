@@ -369,7 +369,7 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
                   type="time"
                   value={activeSchedule.classStartTime}
                   onChange={(e) => updateClassStartTime(e.target.value)}
-                  className="bg-background/50"
+                  className="bg-background/50 [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-0 [&::-webkit-calendar-picker-indicator]:invert"
                 />
               </div>
               <div>

@@ -76,11 +76,16 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
   };
 
   const handleResetToDefaults = async () => {
+    console.log('Reset to defaults clicked');
     if (!confirm('This will delete all your current schedules and restore defaults. Continue?')) {
+      console.log('Reset cancelled by user');
       return;
     }
+    console.log('Calling resetToDefaults...');
     await resetToDefaults();
+    console.log('resetToDefaults completed, reloading data...');
     await loadData();
+    console.log('Data reloaded');
     toast.success('Schedules reset to defaults');
   };
 

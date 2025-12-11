@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Clock } from '@/components/Clock';
 import { Countdown } from '@/components/Countdown';
@@ -16,6 +16,8 @@ import {
   setActiveGroup,
   getCurrentDaySchedule,
   formatTime12Hour,
+  timeToMinutes,
+  getCurrentTimeMinutes,
 } from '@/lib/scheduleStore';
 import { useScheduleTimer } from '@/hooks/useScheduleTimer';
 import { Bell } from 'lucide-react';
@@ -31,6 +33,49 @@ const Index = () => {
   const [initialized, setInitialized] = useState(false);
 
   const timerState = useScheduleTimer(schedule, isMuted);
+  const lastScheduleEndRef = useRef<string | null>(null);
+
+  // Find the best schedule for current time in a group
+  const findBestScheduleForTime = useCallback((groupSchedules: Schedule[]): Schedule | undefined => {
+    const currentDay = getCurrentDaySchedule();
+    const currentMinutes = getCurrentTimeMinutes();
+    
+    // Get schedules that match today or "any" day
+    const todaySchedules = groupSchedules.filter(s => 
+      s.dayOfWeek === currentDay || s.dayOfWeek === 'any'
+    );
+    
+    if (todaySchedules.length === 0) {
+      return groupSchedules[0];
+    }
+    
+    // Sort by start time
+    const sorted = [...todaySchedules].sort((a, b) => 
+      timeToMinutes(a.classStartTime) - timeToMinutes(b.classStartTime)
+    );
+    
+    // Find schedule currently in progress
+    for (const sched of sorted) {
+      const startMin = timeToMinutes(sched.classStartTime);
+      const lastSection = sched.sections[sched.sections.length - 1];
+      const endMin = lastSection ? timeToMinutes(lastSection.endTime) : startMin;
+      
+      if (currentMinutes >= startMin && currentMinutes < endMin) {
+        return sched;
+      }
+    }
+    
+    // Find next upcoming schedule
+    for (const sched of sorted) {
+      const startMin = timeToMinutes(sched.classStartTime);
+      if (currentMinutes < startMin) {
+        return sched;
+      }
+    }
+    
+    // All schedules have passed, return the last one (to show "class ended")
+    return sorted[sorted.length - 1] || groupSchedules[0];
+  }, []);
 
   // Initialize schedules and load appropriate day
   useEffect(() => {
@@ -52,24 +97,8 @@ const Index = () => {
       // Get schedules in the active group
       const groupSchedules = allSchedules.filter(s => s.groupId === activeGroup?.id);
       
-      // Priority: Schedule matching today's day > Schedule with "any" day > First in group
-      const currentDay = getCurrentDaySchedule();
-      let selectedSchedule: Schedule | undefined;
-      
-      // 1. Try schedule matching today in active group
-      if (currentDay) {
-        selectedSchedule = groupSchedules.find(s => s.dayOfWeek === currentDay);
-      }
-      
-      // 2. Try schedule with "any" day in active group
-      if (!selectedSchedule) {
-        selectedSchedule = groupSchedules.find(s => s.dayOfWeek === 'any');
-      }
-      
-      // 3. Fall back to first schedule in group
-      if (!selectedSchedule && groupSchedules.length > 0) {
-        selectedSchedule = groupSchedules[0];
-      }
+      // Find best schedule for current time
+      const selectedSchedule = findBestScheduleForTime(groupSchedules);
       
       if (selectedSchedule) {
         setSchedule(selectedSchedule);
@@ -96,15 +125,7 @@ const Index = () => {
       
       // Find appropriate schedule in the new group
       const groupSchedules = schedules.filter(s => s.groupId === groupId);
-      const currentDay = getCurrentDaySchedule();
-      
-      let selectedSchedule = currentDay 
-        ? groupSchedules.find(s => s.dayOfWeek === currentDay) 
-        : undefined;
-      
-      if (!selectedSchedule) {
-        selectedSchedule = groupSchedules.find(s => s.dayOfWeek === 'any') || groupSchedules[0];
-      }
+      const selectedSchedule = findBestScheduleForTime(groupSchedules);
       
       if (selectedSchedule) {
         setSchedule(selectedSchedule);
@@ -113,6 +134,38 @@ const Index = () => {
       toast.success(`Switched to ${group.name}`);
     }
   };
+
+  // Auto-switch to next schedule when class ends
+  useEffect(() => {
+    if (!schedule || !currentGroup || timerState.isClassActive) {
+      lastScheduleEndRef.current = null;
+      return;
+    }
+    
+    // Class has ended - check if we should switch to next schedule
+    const lastSection = schedule.sections[schedule.sections.length - 1];
+    if (!lastSection) return;
+    
+    const scheduleEndKey = `${schedule.id}-${lastSection.endTime}`;
+    if (lastScheduleEndRef.current === scheduleEndKey) return;
+    
+    const currentMinutes = getCurrentTimeMinutes();
+    const endMinutes = timeToMinutes(lastSection.endTime);
+    
+    // Only switch if we just passed the end time (within 5 minutes)
+    if (currentMinutes >= endMinutes && currentMinutes < endMinutes + 5) {
+      lastScheduleEndRef.current = scheduleEndKey;
+      
+      // Find next schedule in group
+      const groupSchedules = schedules.filter(s => s.groupId === currentGroup.id);
+      const nextSchedule = findBestScheduleForTime(groupSchedules);
+      
+      if (nextSchedule && nextSchedule.id !== schedule.id) {
+        setSchedule(nextSchedule);
+        toast.info(`Switched to ${nextSchedule.name}`);
+      }
+    }
+  }, [timerState.isClassActive, schedule, schedules, currentGroup, findBestScheduleForTime]);
 
   const handleScheduleChange = async (scheduleId: string) => {
     const selected = await getScheduleById(scheduleId);
@@ -242,10 +295,19 @@ const Index = () => {
               className="mt-8 text-center"
             >
               <p className="text-muted-foreground text-lg">
-                {timerState.nextSection 
-                  ? `Class starts at ${formatTime12Hour(schedule.sections[0].startTime)}`
-                  : 'Class has ended'
-                }
+                {(() => {
+                  const currentMinutes = getCurrentTimeMinutes();
+                  const startMinutes = timeToMinutes(schedule.sections[0]?.startTime || '00:00');
+                  const lastSection = schedule.sections[schedule.sections.length - 1];
+                  const endMinutes = lastSection ? timeToMinutes(lastSection.endTime) : 0;
+                  
+                  if (currentMinutes < startMinutes) {
+                    return `Class has not begun — starts at ${formatTime12Hour(schedule.sections[0].startTime)}`;
+                  } else if (currentMinutes >= endMinutes) {
+                    return 'Class has ended';
+                  }
+                  return '';
+                })()}
               </p>
             </motion.div>
           )}

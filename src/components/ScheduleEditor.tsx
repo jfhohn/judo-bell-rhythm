@@ -207,30 +207,30 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
     
     if (!window.confirm(confirmMessage)) return;
     
+    // Delete from IndexedDB immediately
+    await deleteGroup(groupId);
+    
     // If deleting active group, activate first remaining group
-    if (group.isActive) {
-      const remainingGroups = groups.filter(g => g.id !== groupId);
-      if (remainingGroups.length > 0) {
-        setGroups(prev => prev.map(g => 
-          g.id === remainingGroups[0].id ? { ...g, isActive: true } : g
-        ).filter(g => g.id !== groupId));
-      }
+    const remainingGroups = groups.filter(g => g.id !== groupId);
+    if (group.isActive && remainingGroups.length > 0) {
+      await setActiveGroup(remainingGroups[0].id);
+      setGroups(remainingGroups.map(g => 
+        g.id === remainingGroups[0].id ? { ...g, isActive: true } : g
+      ));
     } else {
-      setGroups(prev => prev.filter(g => g.id !== groupId));
+      setGroups(remainingGroups);
     }
     
-    // Remove schedules in this group
+    // Remove schedules in this group from local state
     setSchedules(prev => prev.filter(s => s.groupId !== groupId));
     
-    // Switch to another group
-    const remainingGroups = groups.filter(g => g.id !== groupId);
+    // Switch to another group in UI
     if (remainingGroups.length > 0) {
       setActiveGroupId(remainingGroups[0].id);
       const firstInGroup = schedules.find(s => s.groupId === remainingGroups[0].id);
       if (firstInGroup) setActiveScheduleId(firstInGroup.id);
     }
     
-    setHasChanges(true);
     toast.success('Group deleted');
   };
 

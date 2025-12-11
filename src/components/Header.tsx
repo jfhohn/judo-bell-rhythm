@@ -43,7 +43,7 @@ export function Header({
             className="h-10 md:h-12 w-auto"
           />
           <div>
-            <h1 className="text-lg md:text-xl font-bold text-foreground">SchoolBell</h1>
+            <h1 className="text-lg md:text-xl font-bold text-foreground">SVJ Class Bell</h1>
             <div className="flex items-center gap-2">
               <Select value={currentGroup?.id || ''} onValueChange={onGroupChange}>
                 <SelectTrigger className="h-auto p-0 border-0 bg-transparent text-xs md:text-sm text-muted-foreground hover:text-foreground transition-colors w-auto min-w-0">

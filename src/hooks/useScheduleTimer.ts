@@ -11,6 +11,7 @@ export interface TimerState {
   isTwoMinuteWarning: boolean;
   isClassActive: boolean;
   classProgress: number;
+  sectionProgress: number;
 }
 
 export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = false) {
@@ -23,11 +24,13 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
     isTwoMinuteWarning: false,
     isClassActive: false,
     classProgress: 0,
+    sectionProgress: 0,
   });
 
   const warningPlayedRef = useRef<string | null>(null);
   const twoMinWarningPlayedRef = useRef<string | null>(null);
   const bellPlayedRef = useRef<string | null>(null);
+  const previousSectionRef = useRef<Section | null>(null);
   const audioInitializedRef = useRef(false);
 
   // Sync mute state with audio system
@@ -62,7 +65,12 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
   useEffect(() => {
     if (!schedule) return;
 
-    const updateTimer = () => {
+    const updateTimer = async () => {
+      // Always try to resume audio context in case it got suspended
+      if (audioInitializedRef.current) {
+        await audioSystem.resume();
+      }
+
       const now = new Date();
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
       const currentSeconds = now.getSeconds();
@@ -76,7 +84,13 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
         const startMinutes = timeToMinutes(section.startTime);
         const endMinutes = timeToMinutes(section.endTime);
         
+        // Use <= for end time to include the exact end moment for bell triggering
         if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+          currentSection = section;
+          nextSection = schedule.sections[i + 1] || null;
+          break;
+        } else if (currentMinutes === endMinutes && currentSeconds < 5) {
+          // Brief window at exact end time to catch the transition
           currentSection = section;
           nextSection = schedule.sections[i + 1] || null;
           break;
@@ -89,34 +103,54 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
       let secondsRemaining = 0;
       let isWarningPhase = false;
       let isTwoMinuteWarning = false;
+      let sectionProgress = 0;
 
       if (currentSection) {
+        const startMinutes = timeToMinutes(currentSection.startTime);
         const endMinutes = timeToMinutes(currentSection.endTime);
+        const startSeconds = startMinutes * 60;
         const endSeconds = endMinutes * 60;
         secondsRemaining = endSeconds - totalCurrentSeconds;
         isWarningPhase = secondsRemaining <= 300 && secondsRemaining > 0;
         isTwoMinuteWarning = secondsRemaining <= 120 && secondsRemaining > 0;
 
+        // Calculate section progress
+        const totalSectionSeconds = endSeconds - startSeconds;
+        const elapsedSectionSeconds = totalCurrentSeconds - startSeconds;
+        sectionProgress = Math.max(0, Math.min(100, (elapsedSectionSeconds / totalSectionSeconds) * 100));
+
         // Play 5-minute warning sound
         if (secondsRemaining <= 300 && secondsRemaining > 295 && warningPlayedRef.current !== currentSection.id) {
           warningPlayedRef.current = currentSection.id;
-          audioSystem.playWarning();
+          await audioSystem.resume();
+          audioSystem.playWarning(schedule.warningBellSound);
         }
 
         // Play 2-minute warning sound if enabled for this section
         if (currentSection.playTwoMinWarning && secondsRemaining <= 120 && secondsRemaining > 115 && twoMinWarningPlayedRef.current !== currentSection.id) {
           twoMinWarningPlayedRef.current = currentSection.id;
-          audioSystem.playTwoMinuteWarning();
+          await audioSystem.resume();
+          audioSystem.playTwoMinuteWarning(schedule.warningBellSound);
         }
 
-        // Play bell at section end if enabled
-        if (secondsRemaining <= 0 && bellPlayedRef.current !== currentSection.id) {
+        // Play bell at section end if enabled - trigger in final seconds
+        if (currentSection.playEndBell && secondsRemaining <= 2 && secondsRemaining >= 0 && bellPlayedRef.current !== currentSection.id) {
           bellPlayedRef.current = currentSection.id;
-          if (currentSection.playEndBell) {
-            audioSystem.playBell(currentSection.bellSound as BellSound);
-          }
+          await audioSystem.resume();
+          audioSystem.playBell(schedule.endBellSound as BellSound);
         }
       }
+
+      // Check for section transition - play bell for the section that just ended
+      if (previousSectionRef.current && previousSectionRef.current.id !== currentSection?.id) {
+        const prevSection = previousSectionRef.current;
+        if (prevSection.playEndBell && bellPlayedRef.current !== prevSection.id) {
+          bellPlayedRef.current = prevSection.id;
+          await audioSystem.resume();
+          audioSystem.playBell(schedule.endBellSound as BellSound);
+        }
+      }
+      previousSectionRef.current = currentSection;
 
       // Calculate class progress
       const firstSection = schedule.sections[0];
@@ -138,6 +172,7 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
         isTwoMinuteWarning,
         isClassActive,
         classProgress,
+        sectionProgress,
       });
     };
 

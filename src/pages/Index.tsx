@@ -2,15 +2,18 @@ import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Clock } from '@/components/Clock';
 import { Countdown } from '@/components/Countdown';
-import { SectionTimeline } from '@/components/SectionTimeline';
+import { CurrentSectionProgress } from '@/components/CurrentSectionProgress';
 import { ScheduleEditor } from '@/components/ScheduleEditor';
 import { Header } from '@/components/Header';
 import { 
-  Schedule, 
+  Schedule,
+  ScheduleGroup,
   initializeSchedules, 
   getScheduleByDay, 
   getScheduleById,
   getAllSchedules,
+  getAllGroups,
+  getActiveSchedule,
   getCurrentDaySchedule,
   formatTime12Hour,
 } from '@/lib/scheduleStore';
@@ -20,6 +23,8 @@ import { Bell } from 'lucide-react';
 const Index = () => {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [groups, setGroups] = useState<ScheduleGroup[]>([]);
+  const [currentGroup, setCurrentGroup] = useState<ScheduleGroup | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -31,30 +36,68 @@ const Index = () => {
     const init = async () => {
       await initializeSchedules();
       
-      const allSchedules = await getAllSchedules();
+      const [allSchedules, allGroups] = await Promise.all([
+        getAllSchedules(),
+        getAllGroups(),
+      ]);
+      
       setSchedules(allSchedules);
+      setGroups(allGroups);
       
-      // Get current day or default to Tuesday for demo
+      // Priority: Active schedule matching today > Active with "any" day > Active schedule > First schedule
       const currentDay = getCurrentDaySchedule();
-      let daySchedule: Schedule | undefined;
+      let selectedSchedule: Schedule | undefined;
       
+      // 1. Try active schedule matching today
       if (currentDay) {
-        daySchedule = await getScheduleByDay(currentDay);
+        selectedSchedule = allSchedules.find(s => s.isActive && s.dayOfWeek === currentDay);
       }
       
-      // If no day-based schedule found, use the first one
-      if (!daySchedule && allSchedules.length > 0) {
-        daySchedule = allSchedules[0];
+      // 2. Try active schedule with "any" day
+      if (!selectedSchedule) {
+        selectedSchedule = allSchedules.find(s => s.isActive && s.dayOfWeek === 'any');
       }
       
-      if (daySchedule) {
-        setSchedule(daySchedule);
+      // 3. Try any active schedule
+      if (!selectedSchedule) {
+        selectedSchedule = allSchedules.find(s => s.isActive);
       }
+      
+      // 4. Try schedule matching today's day
+      if (!selectedSchedule && currentDay) {
+        selectedSchedule = allSchedules.find(s => s.dayOfWeek === currentDay);
+      }
+      
+      // 5. Fall back to first schedule
+      if (!selectedSchedule && allSchedules.length > 0) {
+        selectedSchedule = allSchedules[0];
+      }
+      
+      if (selectedSchedule) {
+        setSchedule(selectedSchedule);
+        const group = allGroups.find(g => g.id === selectedSchedule!.groupId);
+        setCurrentGroup(group || allGroups[0]);
+      } else if (allGroups.length > 0) {
+        setCurrentGroup(allGroups[0]);
+      }
+      
       setInitialized(true);
     };
     
     init();
   }, []);
+
+  const handleGroupChange = (groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (group) {
+      setCurrentGroup(group);
+      // Select first schedule in group
+      const firstInGroup = schedules.find(s => s.groupId === groupId);
+      if (firstInGroup) {
+        setSchedule(firstInGroup);
+      }
+    }
+  };
 
   const handleScheduleChange = async (scheduleId: string) => {
     const selected = await getScheduleById(scheduleId);
@@ -66,28 +109,32 @@ const Index = () => {
   // Reload schedules when editor closes
   const handleEditorClose = async () => {
     setShowEditor(false);
-    const allSchedules = await getAllSchedules();
+    const [allSchedules, allGroups] = await Promise.all([
+      getAllSchedules(),
+      getAllGroups(),
+    ]);
     setSchedules(allSchedules);
+    setGroups(allGroups);
     
     // Reload current schedule in case it was modified
     if (schedule) {
       const updated = await getScheduleById(schedule.id);
       if (updated) {
         setSchedule(updated);
+        const group = allGroups.find(g => g.id === updated.groupId);
+        if (group) setCurrentGroup(group);
       } else {
-        // Schedule was deleted, pick another one
-        const currentDay = getCurrentDaySchedule();
-        let newSchedule: Schedule | undefined;
-        
-        if (currentDay) {
-          newSchedule = await getScheduleByDay(currentDay);
+        // Schedule was deleted, pick the active one or first
+        const active = await getActiveSchedule();
+        if (active) {
+          setSchedule(active);
+          const group = allGroups.find(g => g.id === active.groupId);
+          if (group) setCurrentGroup(group);
+        } else if (allSchedules.length > 0) {
+          setSchedule(allSchedules[0]);
+          const group = allGroups.find(g => g.id === allSchedules[0].groupId);
+          if (group) setCurrentGroup(group);
         }
-        
-        if (!newSchedule && allSchedules.length > 0) {
-          newSchedule = allSchedules[0];
-        }
-        
-        setSchedule(newSchedule || null);
       }
     }
   };
@@ -112,8 +159,11 @@ const Index = () => {
       
       {/* Header */}
       <Header
+        groups={groups}
         schedules={schedules}
+        currentGroup={currentGroup}
         currentSchedule={schedule}
+        onGroupChange={handleGroupChange}
         onScheduleChange={handleScheduleChange}
         onSettingsClick={() => setShowEditor(true)}
         isMuted={isMuted}
@@ -148,8 +198,9 @@ const Index = () => {
         {/* Main clock */}
         <Clock 
           time={timerState.currentTime}
-          isWarning={timerState.isWarningPhase && !timerState.secondsRemaining}
+          isWarning={timerState.isWarningPhase}
           isUrgent={timerState.secondsRemaining > 0 && timerState.secondsRemaining <= 60}
+          isTwoMinuteWarning={timerState.isTwoMinuteWarning}
         />
 
         {/* Countdown overlay */}
@@ -181,13 +232,13 @@ const Index = () => {
         </AnimatePresence>
       </main>
 
-      {/* Timeline footer */}
-      {schedule && (
+      {/* Current section progress bar (simplified) */}
+      {schedule && timerState.currentSection && (
         <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/95 to-transparent py-6 pt-12">
-          <SectionTimeline
-            sections={schedule.sections}
-            currentSection={timerState.currentSection}
-            progress={timerState.classProgress}
+          <CurrentSectionProgress
+            section={timerState.currentSection}
+            progress={timerState.sectionProgress}
+            secondsRemaining={timerState.secondsRemaining}
           />
         </div>
       )}

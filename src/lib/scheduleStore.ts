@@ -17,6 +17,7 @@ export interface ScheduleGroup {
   name: string;
   isActive: boolean;
   scheduleIds: string[];
+  order: number;
 }
 
 export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'any';
@@ -32,6 +33,7 @@ export interface Schedule {
   warningBellSound: BellSound;
   endBellSound: BellSound;
   sections: Section[];
+  order: number;
 }
 
 interface SchoolBellDB extends DBSchema {
@@ -50,7 +52,7 @@ interface SchoolBellDB extends DBSchema {
 }
 
 const DB_NAME = 'judo-schoolbell';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let dbPromise: Promise<IDBPDatabase<SchoolBellDB>> | null = null;
 
@@ -75,7 +77,7 @@ function migrateSection(section: any, index: number, sections: any[]): Section {
   };
 }
 
-function migrateSchedule(schedule: any): Schedule {
+function migrateSchedule(schedule: any, index: number = 0): Schedule {
   const sections = schedule.sections.map((s: any, i: number, arr: any[]) => migrateSection(s, i, arr));
   
   return {
@@ -89,6 +91,7 @@ function migrateSchedule(schedule: any): Schedule {
     warningBellSound: schedule.warningBellSound || 'classic',
     endBellSound: schedule.endBellSound || schedule.sections?.[0]?.bellSound || 'classic',
     sections,
+    order: schedule.order ?? index,
   };
 }
 
@@ -113,9 +116,30 @@ function getDB() {
         if (oldVersion < 3 && oldVersion >= 1) {
           const store = transaction.objectStore('schedules');
           store.getAll().then(schedules => {
-            schedules.forEach(schedule => {
-              const migrated = migrateSchedule(schedule);
+            schedules.forEach((schedule, index) => {
+              const migrated = migrateSchedule(schedule, index);
               store.put(migrated);
+            });
+          });
+        }
+        
+        // Migration: add order field to existing data
+        if (oldVersion < 5) {
+          const groupStore = transaction.objectStore('groups');
+          groupStore.getAll().then(groups => {
+            groups.forEach((group, index) => {
+              if (group.order === undefined) {
+                groupStore.put({ ...group, order: index });
+              }
+            });
+          });
+          
+          const scheduleStore = transaction.objectStore('schedules');
+          scheduleStore.getAll().then(schedules => {
+            schedules.forEach((schedule, index) => {
+              if (schedule.order === undefined) {
+                scheduleStore.put({ ...schedule, order: index });
+              }
             });
           });
         }
@@ -127,8 +151,8 @@ function getDB() {
 
 // Default groups
 const defaultGroups: ScheduleGroup[] = [
-  { id: 'standard', name: 'Standard', isActive: true, scheduleIds: ['tuesday', 'thursday', 'saturday'] },
-  { id: 'tournament-prep', name: 'Tournament Prep', isActive: false, scheduleIds: ['tuesday-comp', 'thursday-comp', 'saturday-comp'] },
+  { id: 'standard', name: 'Standard', isActive: true, scheduleIds: ['tuesday', 'thursday', 'saturday'], order: 0 },
+  { id: 'tournament-prep', name: 'Tournament Prep', isActive: false, scheduleIds: ['tuesday-comp', 'thursday-comp', 'saturday-comp'], order: 1 },
 ];
 
 // Default schedules for SVJ
@@ -143,6 +167,7 @@ const defaultSchedules: Schedule[] = [
     classStartTime: '17:30',
     warningBellSound: 'boxing',
     endBellSound: 'schoolbell-loud',
+    order: 0,
     sections: [
       { id: '1', name: 'Warmup', startTime: '17:30', endTime: '17:40', durationMinutes: 10, color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false },
       { id: '2', name: 'Newaza', startTime: '17:40', endTime: '18:10', durationMinutes: 30, color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: true },
@@ -163,6 +188,7 @@ const defaultSchedules: Schedule[] = [
     classStartTime: '17:30',
     warningBellSound: 'boxing',
     endBellSound: 'schoolbell-loud',
+    order: 1,
     sections: [
       { id: '1', name: 'Warmup', startTime: '17:30', endTime: '17:40', durationMinutes: 10, color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false },
       { id: '2', name: 'Newaza', startTime: '17:40', endTime: '18:10', durationMinutes: 30, color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: true },
@@ -183,6 +209,7 @@ const defaultSchedules: Schedule[] = [
     classStartTime: '11:00',
     warningBellSound: 'boxing',
     endBellSound: 'schoolbell-loud',
+    order: 2,
     sections: [
       { id: '1', name: 'Warmup', startTime: '11:00', endTime: '11:10', durationMinutes: 10, color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false },
       { id: '2', name: 'Newaza', startTime: '11:10', endTime: '11:40', durationMinutes: 30, color: 'hsl(217 91% 60%)', playEndBell: true, playTwoMinWarning: true },
@@ -203,6 +230,7 @@ const defaultSchedules: Schedule[] = [
     classStartTime: '17:30',
     warningBellSound: 'boxing',
     endBellSound: 'schoolbell-loud',
+    order: 0,
     sections: [
       { id: '1', name: 'Warmup', startTime: '17:30', endTime: '17:40', durationMinutes: 10, color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false },
       { id: '2', name: 'Newaza', startTime: '17:40', endTime: '17:55', durationMinutes: 15, color: 'hsl(180 70% 45%)', playEndBell: true, playTwoMinWarning: false },
@@ -222,6 +250,7 @@ const defaultSchedules: Schedule[] = [
     classStartTime: '17:30',
     warningBellSound: 'boxing',
     endBellSound: 'schoolbell-loud',
+    order: 1,
     sections: [
       { id: '1', name: 'Warmup', startTime: '17:30', endTime: '17:40', durationMinutes: 10, color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false },
       { id: '2', name: 'Newaza', startTime: '17:40', endTime: '17:55', durationMinutes: 15, color: 'hsl(180 70% 45%)', playEndBell: true, playTwoMinWarning: false },
@@ -241,6 +270,7 @@ const defaultSchedules: Schedule[] = [
     classStartTime: '11:00',
     warningBellSound: 'boxing',
     endBellSound: 'schoolbell-loud',
+    order: 2,
     sections: [
       { id: '1', name: 'Warmup', startTime: '11:00', endTime: '11:10', durationMinutes: 10, color: 'hsl(142 76% 36%)', playEndBell: true, playTwoMinWarning: false },
       { id: '2', name: 'Newaza', startTime: '11:10', endTime: '11:25', durationMinutes: 15, color: 'hsl(180 70% 45%)', playEndBell: true, playTwoMinWarning: false },
@@ -303,7 +333,8 @@ export async function resetToDefaults(): Promise<void> {
 
 export async function getAllGroups(): Promise<ScheduleGroup[]> {
   const db = await getDB();
-  return db.getAll('groups');
+  const groups = await db.getAll('groups');
+  return groups.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 export async function getGroupById(id: string): Promise<ScheduleGroup | undefined> {
@@ -350,7 +381,9 @@ export async function setActiveGroup(groupId: string): Promise<void> {
 export async function getSchedulesByGroup(groupId: string): Promise<Schedule[]> {
   const db = await getDB();
   const allSchedules = await db.getAll('schedules');
-  return allSchedules.filter(s => s.groupId === groupId);
+  return allSchedules
+    .filter(s => s.groupId === groupId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 export async function getScheduleByDay(day: string): Promise<Schedule | undefined> {
@@ -389,7 +422,8 @@ export async function getScheduleById(id: string): Promise<Schedule | undefined>
 
 export async function getAllSchedules(): Promise<Schedule[]> {
   const db = await getDB();
-  return db.getAll('schedules');
+  const schedules = await db.getAll('schedules');
+  return schedules.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 export async function saveSchedule(schedule: Schedule): Promise<void> {

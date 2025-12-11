@@ -6,11 +6,9 @@ import svjLogo from '@/assets/svj-logo.png';
 
 interface HeaderProps {
   groups: ScheduleGroup[];
-  schedules: Schedule[];
   currentGroup: ScheduleGroup | null;
   currentSchedule: Schedule | null;
   onGroupChange: (groupId: string) => void;
-  onScheduleChange: (scheduleId: string) => void;
   onSettingsClick: () => void;
   isMuted: boolean;
   onMuteToggle: () => void;
@@ -18,17 +16,13 @@ interface HeaderProps {
 
 export function Header({ 
   groups,
-  schedules,
   currentGroup,
   currentSchedule, 
   onGroupChange,
-  onScheduleChange, 
   onSettingsClick, 
   isMuted, 
   onMuteToggle 
 }: HeaderProps) {
-  const groupSchedules = schedules.filter(s => s.groupId === currentGroup?.id);
-
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -60,19 +54,14 @@ export function Header({
                   ))}
                 </SelectContent>
               </Select>
-              <span className="text-muted-foreground/50">›</span>
-              <Select value={currentSchedule?.id || ''} onValueChange={onScheduleChange}>
-                <SelectTrigger className="h-auto p-0 border-0 bg-transparent text-xs md:text-sm text-muted-foreground hover:text-foreground transition-colors w-auto min-w-0">
-                  <SelectValue placeholder="Select schedule" />
-                </SelectTrigger>
-                <SelectContent>
-                  {groupSchedules.map(schedule => (
-                    <SelectItem key={schedule.id} value={schedule.id}>
-                      {schedule.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {currentSchedule && (
+                <>
+                  <span className="text-muted-foreground/50">›</span>
+                  <span className="text-xs md:text-sm text-muted-foreground">
+                    {currentSchedule.name}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>

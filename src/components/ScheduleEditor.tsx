@@ -160,12 +160,14 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
   const duplicateSchedule = () => {
     if (!activeSchedule) return;
     
+    const groupScheduleCount = schedules.filter(s => s.groupId === activeSchedule.groupId).length;
     const newSchedule: Schedule = {
       ...activeSchedule,
       id: Date.now().toString(),
       name: `${activeSchedule.name} (Copy)`,
       isActive: false,
       dayOfWeek: undefined,
+      order: groupScheduleCount,
     };
     
     setSchedules(prev => [...prev, newSchedule]);
@@ -196,6 +198,7 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
       name: newGroupName.trim(),
       isActive: false,
       scheduleIds: [],
+      order: groups.length,
     };
     
     setGroups(prev => [...prev, newGroup]);
@@ -258,6 +261,7 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
   };
 
   const createScheduleInGroup = () => {
+    const groupScheduleCount = schedules.filter(s => s.groupId === activeGroupId).length;
     const newSchedule: Schedule = {
       id: Date.now().toString(),
       name: 'New Schedule',
@@ -268,6 +272,7 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
       classStartTime: '18:00',
       warningBellSound: 'classic',
       endBellSound: 'classic',
+      order: groupScheduleCount,
       sections: [
         { id: '1', name: 'Section 1', startTime: '18:00', endTime: '18:30', durationMinutes: 30, color: SECTION_COLORS[0], playEndBell: true, playTwoMinWarning: false },
       ],
@@ -346,11 +351,24 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
               </Button>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2 mb-3">
+            <Reorder.Group
+              axis="x"
+              values={groups}
+              onReorder={(newOrder) => {
+                const reordered = newOrder.map((g, i) => ({ ...g, order: i }));
+                setGroups(reordered);
+                setHasChanges(true);
+              }}
+              className="flex flex-wrap gap-2 mb-3"
+            >
               {groups.map(group => {
                 const isCurrentGroup = activeGroupId === group.id;
                 return (
-                  <div key={group.id} className="relative group/item">
+                  <Reorder.Item
+                    key={group.id}
+                    value={group}
+                    className="relative group/item cursor-grab active:cursor-grabbing"
+                  >
                     <button
                       onClick={() => {
                         setActiveGroupId(group.id);
@@ -358,7 +376,7 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
                         if (firstInGroup) {
                           setActiveScheduleId(firstInGroup.id);
                         } else {
-                          setActiveScheduleId(''); // Clear when switching to empty group
+                          setActiveScheduleId('');
                         }
                       }}
                       className={`
@@ -371,13 +389,14 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
                         }
                       `}
                     >
+                      <GripVertical className="w-3 h-3 opacity-50" />
                       {group.isActive && <Check className="w-3 h-3" />}
                       {group.name}
                     </button>
-                  </div>
+                  </Reorder.Item>
                 );
               })}
-            </div>
+            </Reorder.Group>
           )}
           
           {groups.length > 0 && (
@@ -441,27 +460,45 @@ export function ScheduleEditor({ onClose, currentScheduleId }: ScheduleEditorPro
         ) : groups.length > 0 && (
           <>
             {/* Schedule selector within group */}
-            <div className="flex flex-wrap gap-2 mb-4">
+            <Reorder.Group
+              axis="x"
+              values={groupSchedules}
+              onReorder={(newOrder) => {
+                const reordered = newOrder.map((s, i) => ({ ...s, order: i }));
+                setSchedules(prev => {
+                  const otherSchedules = prev.filter(s => s.groupId !== activeGroupId);
+                  return [...otherSchedules, ...reordered];
+                });
+                setHasChanges(true);
+              }}
+              className="flex flex-wrap gap-2 mb-4"
+            >
               {groupSchedules.map(schedule => (
-                <button
+                <Reorder.Item
                   key={schedule.id}
-                  onClick={() => setActiveScheduleId(schedule.id)}
-                  className={`
-                    px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2
-                    ${activeScheduleId === schedule.id 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                    }
-                  `}
+                  value={schedule}
+                  className="cursor-grab active:cursor-grabbing"
                 >
-                  {schedule.name}
-                </button>
+                  <button
+                    onClick={() => setActiveScheduleId(schedule.id)}
+                    className={`
+                      px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2
+                      ${activeScheduleId === schedule.id 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      }
+                    `}
+                  >
+                    <GripVertical className="w-3 h-3 opacity-50" />
+                    {schedule.name}
+                  </button>
+                </Reorder.Item>
               ))}
-              <Button variant="outline" size="sm" onClick={createScheduleInGroup} className="gap-1">
-                <Plus className="w-4 h-4" />
-                New Schedule
-              </Button>
-            </div>
+            </Reorder.Group>
+            <Button variant="outline" size="sm" onClick={createScheduleInGroup} className="gap-1 mb-4">
+              <Plus className="w-4 h-4" />
+              New Schedule
+            </Button>
 
             {/* Schedule actions */}
             <div className="flex flex-wrap gap-2 mb-6">

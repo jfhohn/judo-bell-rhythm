@@ -8,6 +8,7 @@ import { Header } from '@/components/Header';
 import { 
   Schedule,
   ScheduleGroup,
+  DayOfWeek,
   initializeSchedules, 
   getScheduleById,
   getAllSchedules,
@@ -23,6 +24,24 @@ import { useScheduleTimer } from '@/hooks/useScheduleTimer';
 import { Bell } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Day of week order for cyclical calculation (0 = Sunday, 6 = Saturday)
+const DAY_ORDER: Record<DayOfWeek, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+  any: -1,
+};
+
+interface NextScheduleInfo {
+  schedule: Schedule;
+  daysAway: number;
+  label: string;
+}
+
 const Index = () => {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -31,50 +50,89 @@ const Index = () => {
   const [showEditor, setShowEditor] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [nextScheduleInfo, setNextScheduleInfo] = useState<NextScheduleInfo | null>(null);
 
   const timerState = useScheduleTimer(schedule, isMuted);
   const lastScheduleEndRef = useRef<string | null>(null);
 
-  // Find the best schedule for current time in a group
-  const findBestScheduleForTime = useCallback((groupSchedules: Schedule[]): Schedule | undefined => {
-    const currentDay = getCurrentDaySchedule();
+  // Find the best schedule cyclically across the week
+  const findBestScheduleForTime = useCallback((groupSchedules: Schedule[]): NextScheduleInfo | undefined => {
+    if (groupSchedules.length === 0) return undefined;
+    
+    const now = new Date();
+    const currentDayIndex = now.getDay(); // 0 = Sunday
     const currentMinutes = getCurrentTimeMinutes();
     
-    // Get schedules that match today or "any" day
-    const todaySchedules = groupSchedules.filter(s => 
-      s.dayOfWeek === currentDay || s.dayOfWeek === 'any'
-    );
+    const getDayLabel = (daysAway: number, schedule: Schedule): string => {
+      if (daysAway === 0) return `Today at ${formatTime12Hour(schedule.classStartTime)}`;
+      if (daysAway === 1) return `Tomorrow at ${formatTime12Hour(schedule.classStartTime)}`;
+      
+      // Get the day name
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const targetDayIndex = (currentDayIndex + daysAway) % 7;
+      return `${dayNames[targetDayIndex]} at ${formatTime12Hour(schedule.classStartTime)}`;
+    };
     
-    if (todaySchedules.length === 0) {
-      return groupSchedules[0];
-    }
+    let bestCandidate: { schedule: Schedule; minutesUntilStart: number; daysAway: number } | null = null;
     
-    // Sort by start time
-    const sorted = [...todaySchedules].sort((a, b) => 
-      timeToMinutes(a.classStartTime) - timeToMinutes(b.classStartTime)
-    );
-    
-    // Find schedule currently in progress
-    for (const sched of sorted) {
+    for (const sched of groupSchedules) {
+      const schedDayIndex = sched.dayOfWeek ? DAY_ORDER[sched.dayOfWeek] : -1;
       const startMin = timeToMinutes(sched.classStartTime);
       const lastSection = sched.sections[sched.sections.length - 1];
       const endMin = lastSection ? timeToMinutes(lastSection.endTime) : startMin;
       
-      if (currentMinutes >= startMin && currentMinutes < endMin) {
-        return sched;
+      // Handle "any" day schedules
+      if (sched.dayOfWeek === 'any') {
+        // Currently in progress?
+        if (currentMinutes >= startMin && currentMinutes < endMin) {
+          return { schedule: sched, daysAway: 0, label: getDayLabel(0, sched) };
+        }
+        // Coming up today?
+        if (currentMinutes < startMin) {
+          const minutesUntil = startMin - currentMinutes;
+          if (!bestCandidate || minutesUntil < bestCandidate.minutesUntilStart) {
+            bestCandidate = { schedule: sched, minutesUntilStart: minutesUntil, daysAway: 0 };
+          }
+        }
+        continue;
+      }
+      
+      if (schedDayIndex < 0) continue; // No valid day
+      
+      // Calculate days until this schedule
+      let daysUntil = schedDayIndex - currentDayIndex;
+      if (daysUntil < 0) daysUntil += 7;
+      
+      // If it's today, check time
+      if (daysUntil === 0) {
+        // Currently in progress?
+        if (currentMinutes >= startMin && currentMinutes < endMin) {
+          return { schedule: sched, daysAway: 0, label: getDayLabel(0, sched) };
+        }
+        // Already passed today - schedule for next week
+        if (currentMinutes >= endMin) {
+          daysUntil = 7;
+        }
+      }
+      
+      // Calculate minutes until this schedule starts
+      const minutesUntilStart = daysUntil * 24 * 60 + (startMin - currentMinutes);
+      
+      if (!bestCandidate || minutesUntilStart < bestCandidate.minutesUntilStart) {
+        bestCandidate = { schedule: sched, minutesUntilStart: minutesUntilStart, daysAway: daysUntil };
       }
     }
     
-    // Find next upcoming schedule
-    for (const sched of sorted) {
-      const startMin = timeToMinutes(sched.classStartTime);
-      if (currentMinutes < startMin) {
-        return sched;
-      }
+    if (bestCandidate) {
+      return {
+        schedule: bestCandidate.schedule,
+        daysAway: bestCandidate.daysAway,
+        label: getDayLabel(bestCandidate.daysAway, bestCandidate.schedule),
+      };
     }
     
-    // All schedules have passed, return the last one (to show "class ended")
-    return sorted[sorted.length - 1] || groupSchedules[0];
+    // Fallback to first schedule
+    return { schedule: groupSchedules[0], daysAway: 0, label: '' };
   }, []);
 
   // Initialize schedules and load appropriate day
@@ -97,11 +155,12 @@ const Index = () => {
       // Get schedules in the active group
       const groupSchedules = allSchedules.filter(s => s.groupId === activeGroup?.id);
       
-      // Find best schedule for current time
-      const selectedSchedule = findBestScheduleForTime(groupSchedules);
+      // Find best schedule cyclically
+      const result = findBestScheduleForTime(groupSchedules);
       
-      if (selectedSchedule) {
-        setSchedule(selectedSchedule);
+      if (result) {
+        setSchedule(result.schedule);
+        setNextScheduleInfo(result);
       }
       
       setInitialized(true);
@@ -125,10 +184,11 @@ const Index = () => {
       
       // Find appropriate schedule in the new group
       const groupSchedules = schedules.filter(s => s.groupId === groupId);
-      const selectedSchedule = findBestScheduleForTime(groupSchedules);
+      const result = findBestScheduleForTime(groupSchedules);
       
-      if (selectedSchedule) {
-        setSchedule(selectedSchedule);
+      if (result) {
+        setSchedule(result.schedule);
+        setNextScheduleInfo(result);
       }
       
       toast.success(`Switched to ${group.name}`);
@@ -156,23 +216,40 @@ const Index = () => {
     if (currentMinutes >= endMinutes && currentMinutes < endMinutes + 5) {
       lastScheduleEndRef.current = scheduleEndKey;
       
-      // Find next schedule in group
+      // Find next schedule cyclically
       const groupSchedules = schedules.filter(s => s.groupId === currentGroup.id);
-      const nextSchedule = findBestScheduleForTime(groupSchedules);
+      const result = findBestScheduleForTime(groupSchedules);
       
-      if (nextSchedule && nextSchedule.id !== schedule.id) {
-        setSchedule(nextSchedule);
-        toast.info(`Switched to ${nextSchedule.name}`);
+      if (result && result.schedule.id !== schedule.id) {
+        setSchedule(result.schedule);
+        setNextScheduleInfo(result);
+        toast.info(`Next: ${result.schedule.name}`);
+      } else if (result) {
+        // Same schedule (for next week), just update the info
+        setNextScheduleInfo(result);
       }
     }
   }, [timerState.isClassActive, schedule, schedules, currentGroup, findBestScheduleForTime]);
 
-  const handleScheduleChange = async (scheduleId: string) => {
-    const selected = await getScheduleById(scheduleId);
-    if (selected) {
-      setSchedule(selected);
-    }
-  };
+  // Periodically refresh next schedule info (every minute)
+  useEffect(() => {
+    if (!currentGroup || !schedules.length) return;
+    
+    const interval = setInterval(() => {
+      const groupSchedules = schedules.filter(s => s.groupId === currentGroup.id);
+      const result = findBestScheduleForTime(groupSchedules);
+      
+      if (result) {
+        // Only update if schedule changed
+        if (!schedule || result.schedule.id !== schedule.id) {
+          setSchedule(result.schedule);
+        }
+        setNextScheduleInfo(result);
+      }
+    }, 60000); // Every minute
+    
+    return () => clearInterval(interval);
+  }, [currentGroup, schedules, schedule, findBestScheduleForTime]);
 
   // Reload schedules when editor closes
   const handleEditorClose = async () => {
@@ -193,20 +270,17 @@ const Index = () => {
       const updated = await getScheduleById(schedule.id);
       if (updated) {
         setSchedule(updated);
+        // Refresh next schedule info
+        const groupSchedules = allSchedules.filter(s => s.groupId === activeGroup?.id);
+        const result = findBestScheduleForTime(groupSchedules);
+        if (result) setNextScheduleInfo(result);
       } else {
         // Schedule was deleted, pick from active group
         const groupSchedules = allSchedules.filter(s => s.groupId === activeGroup?.id);
-        const currentDay = getCurrentDaySchedule();
-        let selectedSchedule = currentDay 
-          ? groupSchedules.find(s => s.dayOfWeek === currentDay) 
-          : undefined;
-        
-        if (!selectedSchedule) {
-          selectedSchedule = groupSchedules[0];
-        }
-        
-        if (selectedSchedule) {
-          setSchedule(selectedSchedule);
+        const result = findBestScheduleForTime(groupSchedules);
+        if (result) {
+          setSchedule(result.schedule);
+          setNextScheduleInfo(result);
         }
       }
     }
@@ -233,11 +307,9 @@ const Index = () => {
       {/* Header */}
       <Header
         groups={groups}
-        schedules={schedules}
         currentGroup={currentGroup}
         currentSchedule={schedule}
         onGroupChange={handleGroupChange}
-        onScheduleChange={handleScheduleChange}
         onSettingsClick={() => setShowEditor(true)}
         isMuted={isMuted}
         onMuteToggle={() => setIsMuted(!isMuted)}
@@ -287,7 +359,7 @@ const Index = () => {
 
         {/* Waiting state */}
         <AnimatePresence>
-          {!timerState.isClassActive && schedule && (
+          {!timerState.isClassActive && schedule && nextScheduleInfo && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -295,19 +367,10 @@ const Index = () => {
               className="mt-8 text-center"
             >
               <p className="text-muted-foreground text-lg">
-                {(() => {
-                  const currentMinutes = getCurrentTimeMinutes();
-                  const startMinutes = timeToMinutes(schedule.sections[0]?.startTime || '00:00');
-                  const lastSection = schedule.sections[schedule.sections.length - 1];
-                  const endMinutes = lastSection ? timeToMinutes(lastSection.endTime) : 0;
-                  
-                  if (currentMinutes < startMinutes) {
-                    return `Class has not begun — starts at ${formatTime12Hour(schedule.sections[0].startTime)}`;
-                  } else if (currentMinutes >= endMinutes) {
-                    return 'Waiting for next class to start';
-                  }
-                  return '';
-                })()}
+                {nextScheduleInfo.daysAway === 0 && timeToMinutes(schedule.classStartTime) > getCurrentTimeMinutes()
+                  ? `Class starts ${nextScheduleInfo.label.replace('Today at ', 'at ')}`
+                  : `Next class: ${nextScheduleInfo.label}`
+                }
               </p>
             </motion.div>
           )}

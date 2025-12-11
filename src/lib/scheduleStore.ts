@@ -229,8 +229,13 @@ export async function initializeSchedules(): Promise<void> {
 export async function resetToDefaults(): Promise<void> {
   console.log('resetToDefaults: starting...');
   try {
+    // Force a fresh connection by clearing the cached promise
+    console.log('resetToDefaults: about to clear dbPromise');
+    dbPromise = null;
+    console.log('resetToDefaults: cleared db cache, calling getDB...');
+    
     const db = await getDB();
-    console.log('resetToDefaults: got db');
+    console.log('resetToDefaults: got fresh db');
     
     // Clear all stores using clear() for efficiency
     const tx = db.transaction(['groups', 'schedules', 'meta'], 'readwrite');

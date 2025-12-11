@@ -207,23 +207,16 @@ const defaultSchedules: Schedule[] = [
 export async function initializeSchedules(): Promise<void> {
   const db = await getDB();
   
-  // Check if already initialized - only create defaults on first-ever run
-  const initialized = await db.get('meta', 'initialized');
-  if (initialized?.value) {
-    return; // Skip - user has already set up their schedules
-  }
-  
-  // Check if user already has data (existing users before this update)
+  // Check if user already has data
   const existingGroups = await db.getAll('groups');
   const existingSchedules = await db.getAll('schedules');
   
-  if (existingGroups.length > 0 || existingSchedules.length > 0) {
-    // User already has data - don't recreate defaults, just mark as initialized
-    await db.put('meta', { key: 'initialized', value: true });
+  // If user has data, skip initialization
+  if (existingGroups.length > 0 && existingSchedules.length > 0) {
     return;
   }
   
-  // Fresh install - create defaults
+  // No data - create defaults (either fresh install or user deleted everything)
   for (const group of defaultGroups) {
     await db.put('groups', group);
   }
@@ -231,9 +224,30 @@ export async function initializeSchedules(): Promise<void> {
   for (const schedule of defaultSchedules) {
     await db.put('schedules', schedule);
   }
+}
+
+export async function resetToDefaults(): Promise<void> {
+  const db = await getDB();
   
-  // Mark as initialized so defaults are never re-created
-  await db.put('meta', { key: 'initialized', value: true });
+  // Clear existing data
+  const existingGroups = await db.getAll('groups');
+  const existingSchedules = await db.getAll('schedules');
+  
+  for (const group of existingGroups) {
+    await db.delete('groups', group.id);
+  }
+  for (const schedule of existingSchedules) {
+    await db.delete('schedules', schedule.id);
+  }
+  
+  // Create defaults
+  for (const group of defaultGroups) {
+    await db.put('groups', group);
+  }
+  
+  for (const schedule of defaultSchedules) {
+    await db.put('schedules', schedule);
+  }
 }
 
 export async function getAllGroups(): Promise<ScheduleGroup[]> {

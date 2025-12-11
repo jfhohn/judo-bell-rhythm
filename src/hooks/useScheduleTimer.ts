@@ -131,9 +131,10 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
         if (
           currentSection.playTwoMinWarning &&
           secondsRemaining <= 120 &&
-          secondsRemaining > 117 &&
+          secondsRemaining > 115 &&
           twoMinWarningPlayedRef.current !== currentSection.id
         ) {
+          console.log('[BELL] 2-minute warning triggered for:', currentSection.name, 'seconds remaining:', secondsRemaining);
           twoMinWarningPlayedRef.current = currentSection.id;
           await audioSystem.resume();
           audioSystem.playTwoMinuteWarning(schedule.warningBellSound);
@@ -146,6 +147,7 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
           secondsRemaining > 0 &&
           bellPlayedRef.current !== currentSection.id
         ) {
+          console.log('[BELL] End bell triggered for:', currentSection.name, 'seconds remaining:', secondsRemaining);
           bellPlayedRef.current = currentSection.id;
           await audioSystem.resume();
           audioSystem.playBell(schedule.endBellSound as BellSound);

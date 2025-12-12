@@ -17,6 +17,7 @@ import {
   setActiveGroup,
   getCurrentDaySchedule,
   formatTime12Hour,
+  formatTimeDisplay,
   timeToMinutes,
   getCurrentTimeMinutes,
 } from '@/lib/scheduleStore';
@@ -343,37 +344,39 @@ const Index = () => {
         {/* Layout switches based on warning phase */}
         <AnimatePresence mode="wait">
           {timerState.isWarningPhase ? (
-            // Countdown-primary layout (final 5 minutes)
+            // Countdown-primary layout (final 5 minutes) - positions swapped
             <motion.div
               key="countdown-primary"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.4 }}
-              className="flex flex-col items-center"
+              className="flex flex-col items-center justify-center"
             >
-              {/* Smaller clock at top */}
-              <motion.div
-                initial={{ scale: 1 }}
-                animate={{ scale: 0.6, opacity: 0.7 }}
-                transition={{ duration: 0.4 }}
-                className="mb-4"
-              >
-                <Clock 
-                  time={timerState.currentTime}
-                  isWarning={timerState.isWarningPhase}
-                  isUrgent={timerState.secondsRemaining > 0 && timerState.secondsRemaining <= 60}
-                  isTwoMinuteWarning={timerState.isTwoMinuteWarning}
-                />
-              </motion.div>
-
-              {/* Large countdown as primary focus */}
+              {/* Large countdown as primary focus - clock position/size */}
               <Countdown
                 secondsRemaining={timerState.secondsRemaining}
                 isVisible={true}
                 sectionName={timerState.currentSection?.name || ''}
                 isPrimary={true}
               />
+
+              {/* Smaller clock below - countdown position/size */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+                className="mt-8"
+              >
+                <div className="glass-panel px-6 py-4">
+                  <p className="text-muted-foreground uppercase tracking-widest mb-1 text-sm text-center">
+                    Current Time
+                  </p>
+                  <p className="font-mono text-3xl md:text-5xl text-warning font-bold text-center">
+                    {formatTimeDisplay(timerState.currentTime)}
+                  </p>
+                </div>
+              </motion.div>
             </motion.div>
           ) : (
             // Clock-primary layout (normal mode)

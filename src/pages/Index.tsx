@@ -348,7 +348,9 @@ const Index = () => {
                   <p className="text-muted-foreground uppercase tracking-widest mb-1 text-sm text-center">
                     Current Time
                   </p>
-                  <p className="font-mono text-3xl md:text-5xl font-bold text-center text-warning">
+                  <p className={`font-mono text-3xl md:text-5xl font-bold text-center ${
+                    timerState.secondsRemaining <= 120 ? 'text-destructive' : 'text-warning'
+                  }`}>
                     {formatTimeDisplay(timerState.currentTime)}
                   </p>
                 </div>

@@ -340,22 +340,60 @@ const Index = () => {
           )}
         </AnimatePresence>
 
-        {/* Main clock */}
-        <Clock 
-          time={timerState.currentTime}
-          isWarning={timerState.isWarningPhase}
-          isUrgent={timerState.secondsRemaining > 0 && timerState.secondsRemaining <= 60}
-          isTwoMinuteWarning={timerState.isTwoMinuteWarning}
-        />
+        {/* Layout switches based on warning phase */}
+        <AnimatePresence mode="wait">
+          {timerState.isWarningPhase ? (
+            // Countdown-primary layout (final 5 minutes)
+            <motion.div
+              key="countdown-primary"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col items-center"
+            >
+              {/* Smaller clock at top */}
+              <motion.div
+                initial={{ scale: 1 }}
+                animate={{ scale: 0.6, opacity: 0.7 }}
+                transition={{ duration: 0.4 }}
+                className="mb-4"
+              >
+                <Clock 
+                  time={timerState.currentTime}
+                  isWarning={timerState.isWarningPhase}
+                  isUrgent={timerState.secondsRemaining > 0 && timerState.secondsRemaining <= 60}
+                  isTwoMinuteWarning={timerState.isTwoMinuteWarning}
+                />
+              </motion.div>
 
-        {/* Countdown overlay */}
-        <div className="mt-8 md:mt-12">
-          <Countdown
-            secondsRemaining={timerState.secondsRemaining}
-            isVisible={timerState.isWarningPhase}
-            sectionName={timerState.currentSection?.name || ''}
-          />
-        </div>
+              {/* Large countdown as primary focus */}
+              <Countdown
+                secondsRemaining={timerState.secondsRemaining}
+                isVisible={true}
+                sectionName={timerState.currentSection?.name || ''}
+                isPrimary={true}
+              />
+            </motion.div>
+          ) : (
+            // Clock-primary layout (normal mode)
+            <motion.div
+              key="clock-primary"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col items-center"
+            >
+              <Clock 
+                time={timerState.currentTime}
+                isWarning={timerState.isWarningPhase}
+                isUrgent={timerState.secondsRemaining > 0 && timerState.secondsRemaining <= 60}
+                isTwoMinuteWarning={timerState.isTwoMinuteWarning}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Waiting state */}
         <AnimatePresence>

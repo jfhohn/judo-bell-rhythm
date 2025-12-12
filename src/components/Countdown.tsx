@@ -43,8 +43,11 @@ export function Countdown({ secondsRemaining, isVisible, sectionName, isPrimary 
                   ? 'text-[8rem] md:text-[12rem] lg:text-[16rem] leading-none' 
                   : 'text-5xl md:text-7xl'
               } ${isUrgent ? 'text-destructive' : 'text-warning'}`}
-              animate={isUrgent ? { scale: [1, 1.02, 1] } : {}}
-              transition={{ duration: 0.5, repeat: Infinity }}
+              animate={isUrgent 
+                ? { scale: [1, 1.02, 1] } 
+                : { scale: [1, 1.01, 1], opacity: [1, 0.85, 1] }
+              }
+              transition={{ duration: isUrgent ? 0.5 : 1.5, repeat: Infinity }}
             >
               {formatNumber(minutes)}:{formatNumber(seconds)}
             </motion.div>

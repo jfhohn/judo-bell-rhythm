@@ -4,12 +4,13 @@ interface CountdownProps {
   secondsRemaining: number;
   isVisible: boolean;
   sectionName: string;
+  isPrimary?: boolean;
 }
 
-export function Countdown({ secondsRemaining, isVisible, sectionName }: CountdownProps) {
+export function Countdown({ secondsRemaining, isVisible, sectionName, isPrimary = false }: CountdownProps) {
   const minutes = Math.floor(secondsRemaining / 60);
   const seconds = secondsRemaining % 60;
-  const isUrgent = secondsRemaining <= 60;
+  const isUrgent = secondsRemaining <= 120; // Red pulsing at 2 minutes
 
   const formatNumber = (n: number) => n.toString().padStart(2, '0');
 
@@ -21,11 +22,13 @@ export function Countdown({ secondsRemaining, isVisible, sectionName }: Countdow
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="glass-panel p-6 md:p-8"
+          className={`glass-panel ${isPrimary ? 'p-8 md:p-12' : 'p-6 md:p-8'}`}
         >
           <div className="text-center">
             <motion.p 
-              className="text-muted-foreground text-sm md:text-base uppercase tracking-widest mb-2"
+              className={`text-muted-foreground uppercase tracking-widest mb-2 ${
+                isPrimary ? 'text-base md:text-lg' : 'text-sm md:text-base'
+              }`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
@@ -34,9 +37,9 @@ export function Countdown({ secondsRemaining, isVisible, sectionName }: Countdow
             </motion.p>
             
             <motion.div 
-              className={`font-mono font-bold text-5xl md:text-7xl ${
-                isUrgent ? 'text-destructive' : 'text-warning'
-              }`}
+              className={`font-mono font-bold ${
+                isPrimary ? 'text-7xl md:text-9xl' : 'text-5xl md:text-7xl'
+              } ${isUrgent ? 'text-destructive' : 'text-warning'}`}
               animate={isUrgent ? { scale: [1, 1.02, 1] } : {}}
               transition={{ duration: 0.5, repeat: Infinity }}
             >
@@ -55,7 +58,7 @@ export function Countdown({ secondsRemaining, isVisible, sectionName }: Countdow
                   transition={{ duration: 0.5, repeat: Infinity }}
                 />
                 <span className="text-destructive font-medium uppercase tracking-wider text-sm">
-                  Final Minute
+                  Final 2 Minutes
                 </span>
               </motion.div>
             )}

@@ -32,6 +32,7 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
   const bellPlayedRef = useRef<string | null>(null);
   const previousSectionRef = useRef<Section | null>(null);
   const audioInitializedRef = useRef(false);
+  const lastBellTimeRef = useRef<number>(0);
 
   // Sync mute state with audio system
   useEffect(() => {
@@ -140,25 +141,25 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
           audioSystem.playTwoMinuteWarning(schedule.warningBellSound);
         }
 
-        // Play bell at section end if enabled - trigger in final 5 seconds for reliability
-        if (
-          currentSection.playEndBell &&
-          secondsRemaining <= 5 &&
-          secondsRemaining > 0 &&
-          bellPlayedRef.current !== currentSection.id
-        ) {
-          console.log('[BELL] End bell triggered for:', currentSection.name, 'seconds remaining:', secondsRemaining);
-          bellPlayedRef.current = currentSection.id;
-          await audioSystem.resume();
-          audioSystem.playBell(schedule.endBellSound as BellSound);
-        }
       }
 
       // Check for section transition - play bell for the section that just ended
+      // This handles both normal transitions and class ending (last section → null)
       if (previousSectionRef.current && previousSectionRef.current.id !== currentSection?.id) {
         const prevSection = previousSectionRef.current;
-        if (prevSection.playEndBell && bellPlayedRef.current !== prevSection.id) {
+        const now = Date.now();
+        const timeSinceLastBell = now - lastBellTimeRef.current;
+
+        if (
+          prevSection.playEndBell &&
+          bellPlayedRef.current !== prevSection.id &&
+          timeSinceLastBell > 10000 // At least 10 seconds since last bell
+        ) {
+          const isClassEnding = currentSection === null;
+          console.log('[BELL] End bell triggered for:', prevSection.name,
+            isClassEnding ? '(class ending)' : '(section transition)');
           bellPlayedRef.current = prevSection.id;
+          lastBellTimeRef.current = now;
           await audioSystem.resume();
           audioSystem.playBell(schedule.endBellSound as BellSound);
         }

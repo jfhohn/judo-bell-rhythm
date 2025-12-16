@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.0.4] - 2024-12-16
+
+### Fixed
+- **Double-bell issue**: Fixed race condition causing end bell to play twice at section transitions
+  - Consolidated from two bell triggers to single transition-based trigger
+  - Added 10-second cooldown protection against browser throttling edge cases
+  - Bell now plays exactly once at section end (including when last section/class ends)
+  - Improved logging distinguishes between normal transitions and class ending
+
 ## [3.0.3] - 2024-12-11
 
 ### Changed

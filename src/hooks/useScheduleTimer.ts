@@ -141,6 +141,21 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
           audioSystem.playTwoMinuteWarning(schedule.warningBellSound);
         }
 
+        // Precise end trigger - fire at exactly 0-1 seconds remaining
+        const now = Date.now();
+        if (
+          currentSection.playEndBell &&
+          secondsRemaining <= 1 &&
+          secondsRemaining >= 0 &&
+          bellPlayedRef.current !== currentSection.id &&
+          (now - lastBellTimeRef.current) > 10000
+        ) {
+          console.log('[BELL] End bell triggered for:', currentSection.name, '(precise timing)');
+          bellPlayedRef.current = currentSection.id;
+          lastBellTimeRef.current = now;
+          await audioSystem.resume();
+          audioSystem.playBell(schedule.endBellSound as BellSound);
+        }
       }
 
       // Check for section transition - play bell for the section that just ended
@@ -157,7 +172,7 @@ export function useScheduleTimer(schedule: Schedule | null, isMuted: boolean = f
         ) {
           const isClassEnding = currentSection === null;
           console.log('[BELL] End bell triggered for:', prevSection.name,
-            isClassEnding ? '(class ending)' : '(section transition)');
+            isClassEnding ? '(class ending)' : '(fallback transition)');
           bellPlayedRef.current = prevSection.id;
           lastBellTimeRef.current = now;
           await audioSystem.resume();

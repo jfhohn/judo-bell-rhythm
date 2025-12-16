@@ -4,10 +4,11 @@
 
 ### Fixed
 - **Double-bell issue**: Fixed race condition causing end bell to play twice at section transitions
-  - Consolidated from two bell triggers to single transition-based trigger
-  - Added 10-second cooldown protection against browser throttling edge cases
-  - Bell now plays exactly once at section end (including when last section/class ends)
-  - Improved logging distinguishes between normal transitions and class ending
+  - Added precise timing trigger at exactly 0-1 seconds remaining for on-time bell
+  - Kept transition-based trigger as fallback for edge cases (class ending, browser throttling)
+  - Added 10-second cooldown protection to prevent double-firing
+  - Bell now plays exactly once at section end, on time
+  - Improved logging distinguishes between precise timing and fallback triggers
 
 ## [3.0.3] - 2024-12-11
 

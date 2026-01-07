@@ -25,13 +25,15 @@ Judo instructors need to track multiple class sections (warmup, newaza, tachiwaz
 
 ### Audio System
 - Differentiated warning vs end bells
-- Multiple bell sounds (Classic, School, Gong, Chime)
-- Per-section audio configuration
-- 5-minute and 2-minute warnings
+- Multiple bell sounds (Classic, School, Gong, Chime, Boxing, Loud School Bell)
+- Per-schedule bell configuration (warning bell + end bell)
+- 2-minute audio warning (configurable)
+- 5-minute visual-only warning
 
 ### Visual Display
 - Large, distance-readable clock (12-hour format)
 - Red flashing in final 2 minutes
+- 5-minute countdown display
 - Current section progress bar
 - Section color indicators
 

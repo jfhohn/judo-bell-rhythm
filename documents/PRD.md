@@ -1,29 +1,35 @@
 # Judo SchoolBell - Product Requirements Document
 
 ## Product Vision
-A purpose-built class timer application for Silicon Valley Judo instructors, eliminating timing distractions during martial arts instruction.
+
+A purpose-built class manager and timer application for Silicon Valley Judo instructors, eliminating timing distractions during martial arts instruction.
 
 ## Problem Statement
+
 Judo instructors need to track multiple class sections (warmup, newaza, tachiwaza, randori) but constantly checking clocks disrupts teaching flow. Existing timer apps require manual intervention and don't support the structured schedule format needed for judo classes.
 
 ## Target Users
+
 - **Primary**: SVJ instructors running structured judo classes
 - **Secondary**: Students benefiting from consistent, predictable class timing
 
 ## Core Features
 
 ### Automatic Timer Operation
+
 - Zero manual intervention after startup
 - Sections run on schedule automatically
 - No pause/override functionality by design
 
 ### Schedule Management
+
 - Multiple schedule groups (Standard, Tournament, etc.)
 - Day-of-week assignment for auto-loading
 - Active schedule designation
 - Duration-based time entry with auto-calculation
 
 ### Audio System
+
 - Differentiated warning vs end bells
 - Multiple bell sounds (Classic, School, Gong, Chime, Boxing, Loud School Bell)
 - Per-schedule bell configuration (warning bell + end bell)
@@ -31,6 +37,7 @@ Judo instructors need to track multiple class sections (warmup, newaza, tachiwaz
 - 5-minute visual-only warning
 
 ### Visual Display
+
 - Large, distance-readable clock (12-hour format)
 - Red flashing in final 2 minutes
 - 5-minute countdown display
@@ -38,6 +45,7 @@ Judo instructors need to track multiple class sections (warmup, newaza, tachiwaz
 - Section color indicators
 
 ## Tech Stack
+
 - React + TypeScript + Vite
 - IndexedDB for offline persistence
 - Web Audio API for synthesized sounds
@@ -45,6 +53,7 @@ Judo instructors need to track multiple class sections (warmup, newaza, tachiwaz
 - shadcn/ui components
 
 ## Design Principles
+
 - Offline-first architecture
 - Distance-optimized visibility
 - Zero-distraction operation

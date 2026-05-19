@@ -3,28 +3,47 @@
 ## Directory Layout
 ```
 src/
-├── assets/           # Static assets (logo)
-├── components/       # React components
-│   ├── ui/          # shadcn/ui primitives
-│   ├── Clock.tsx    # Main time display
-│   ├── Countdown.tsx # Warning countdown
-│   ├── CurrentSectionProgress.tsx # Progress bar
-│   ├── Header.tsx   # Navigation header
-│   └── ScheduleEditor.tsx # Schedule management
+├── assets/                         # Static assets (logo)
+├── components/                     # React components
+│   ├── ui/                         # shadcn/ui primitives
+│   ├── Clock.tsx                   # Class bell time display
+│   ├── Countdown.tsx               # Warning countdown
+│   ├── CurrentSectionProgress.tsx  # Progress bar
+│   ├── Header.tsx                  # Navigation header (incl. Tournament link)
+│   ├── ScheduleEditor.tsx          # Schedule management
+│   └── tournament/
+│       ├── AthleteRow.tsx          # White/Blue scoreboard row
+│       ├── MainClock.tsx           # Big match clock + nudgers
+│       ├── OsaekomiChip.tsx        # Osaekomi sub-timer chip
+│       ├── ShidoCards.tsx          # Yellow card visuals
+│       ├── EndGamePanel.tsx        # "Won by" reason picker
+│       ├── MatchControls.tsx       # Undo / Golden / Switch / End / Reset
+│       └── KeyboardHelp.tsx        # Shortcut overlay
 ├── hooks/
-│   └── useScheduleTimer.ts # Timer logic hook
+│   ├── useScheduleTimer.ts         # Class bell timer logic
+│   ├── useMatchController.ts       # Match state + undo + RAF tick
+│   ├── useMatchKeyboard.ts         # Operator keyboard shortcuts
+│   └── useMatchSync.ts             # BroadcastChannel + localStorage mirror
 ├── lib/
-│   ├── audioSystem.ts # Web Audio API sounds
-│   ├── scheduleStore.ts # IndexedDB + data models
-│   └── utils.ts     # Utilities
+│   ├── audioSystem.ts              # Web Audio API sounds (shared)
+│   ├── scheduleStore.ts            # Class bell IndexedDB store
+│   ├── matchStore.ts               # Tournament IndexedDB store
+│   ├── matchTypes.ts               # MatchState, MatchEvent, Athlete, ...
+│   ├── matchReducer.ts             # Pure reducer + live time helpers + factory
+│   ├── matchPresets.ts             # IJF + USA Judo rule presets
+│   └── utils.ts                    # Utilities
 ├── pages/
-│   └── Index.tsx    # Main app page
-└── index.css        # Global styles
+│   ├── Index.tsx                   # Class bell main page (/)
+│   ├── Tournament.tsx              # Operator scoreboard (/tournament)
+│   ├── TournamentSetup.tsx         # New match config (/tournament/setup)
+│   ├── TournamentDisplay.tsx       # Spectator view (/tournament/display)
+│   └── NotFound.tsx
+└── index.css                       # Global styles + design tokens
 ```
 
 ## Key Data Models
 
-### Schedule
+### Schedule (Class Bell)
 ```typescript
 interface Schedule {
   id: string;
@@ -39,7 +58,7 @@ interface Schedule {
 }
 ```
 
-### Section
+### Section (Class Bell)
 ```typescript
 interface Section {
   id: string;
@@ -53,8 +72,33 @@ interface Section {
 }
 ```
 
+### MatchState (Tournament)
+```typescript
+interface MatchState {
+  id: string;
+  createdAt: number;
+  presetId: string;
+  divisionLabel: string;
+  rule: RuleConfig;            // durationSec, goldenScoreCapSec, shidoToDq, osaekomi thresholds
+  white: Athlete;
+  blue: Athlete;
+  scores: { white: AthleteScore; blue: AthleteScore };
+  phase: 'regulation' | 'golden-score' | 'ended';
+  clockSec: number;            // remaining (regulation) or elapsed (golden)
+  clockRunning: boolean;
+  clockAnchorMs: number | null; // performance.now() anchor while running
+  osaekomi: OsaekomiState;
+  result: MatchResult | null;
+}
+```
+
+Match actions flow through a pure `matchReducer(state, event)` so Undo and
+(future) audit logs are trivial. Live clock values are derived via
+`liveClockSec(state, performance.now())` instead of being persisted on every tick.
+
 ## Dependencies
 - idb: IndexedDB wrapper
 - framer-motion: Animations
 - lucide-react: Icons
 - sonner: Toast notifications
+- react-router-dom: Routing (`/`, `/tournament`, `/tournament/setup`, `/tournament/display`)

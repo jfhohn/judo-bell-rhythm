@@ -55,6 +55,19 @@ export default {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
         },
+        "athlete-white": {
+          DEFAULT: "hsl(var(--athlete-white-bg))",
+          foreground: "hsl(var(--athlete-white-fg))",
+          muted: "hsl(var(--athlete-white-muted))",
+        },
+        "athlete-blue": {
+          DEFAULT: "hsl(var(--athlete-blue-bg))",
+          foreground: "hsl(var(--athlete-blue-fg))",
+          muted: "hsl(var(--athlete-blue-muted))",
+        },
+        shido: "hsl(var(--shido-card))",
+        osaekomi: "hsl(var(--osaekomi-chip))",
+        scoreboard: "hsl(var(--scoreboard-bg))",
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],

@@ -48,6 +48,17 @@
     --section-upcoming: 217 32% 25%;
     --countdown-urgent: 0 84% 60%;
     --countdown-warning: 38 92% 50%;
+
+    /* Tournament scoreboard tokens */
+    --athlete-white-bg: 0 0% 98%;
+    --athlete-white-fg: 222 47% 6%;
+    --athlete-white-muted: 222 20% 40%;
+    --athlete-blue-bg: 220 90% 38%;
+    --athlete-blue-fg: 0 0% 100%;
+    --athlete-blue-muted: 220 40% 85%;
+    --shido-card: 48 96% 53%;
+    --osaekomi-chip: 38 90% 45%;
+    --scoreboard-bg: 222 47% 4%;
   }
 
   .dark {

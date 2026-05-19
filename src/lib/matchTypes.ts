@@ -95,4 +95,6 @@ export type MatchEvent =
   | { type: 'ENTER_GOLDEN_SCORE'; at: number }
   | { type: 'SWITCH_SIDES'; at: number }
   | { type: 'END_MATCH'; reason: WinReason; winner: Side | 'draw' | 'double'; at: number }
-  | { type: 'RESET_MATCH'; at: number };
+  | { type: 'RESET_MATCH'; at: number }
+  | { type: 'UPDATE_ATHLETE'; side: Side; athlete: Athlete; at: number }
+  | { type: 'UPDATE_DIVISION'; label: string; at: number };

@@ -226,6 +226,14 @@ export function matchReducer(state: MatchState, event: MatchEvent): MatchState {
       };
     }
 
+    case 'UPDATE_ATHLETE': {
+      return { ...state, [event.side]: event.athlete } as MatchState;
+    }
+
+    case 'UPDATE_DIVISION': {
+      return { ...state, divisionLabel: event.label };
+    }
+
     default:
       return state;
   }

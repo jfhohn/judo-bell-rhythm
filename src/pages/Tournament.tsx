@@ -219,7 +219,7 @@ function TournamentInner({
           score={state.scores.white}
           osaekomiActive={state.osaekomi.side === 'white'}
           osaekomiSec={state.osaekomi.side === 'white' ? osaekomiSec : 0}
-          onAthleteChange={(a) => dispatch({ type: 'SCORE_ADD', side: 'white', kind: 'shido', at: -1 }) /* placeholder; replaced below */}
+          onAthleteChange={(a) => dispatch({ type: 'UPDATE_ATHLETE', side: 'white', athlete: a, at: Date.now() })}
           onScore={(kind, delta) => score('white', kind, delta)}
           onOsaekomiToggle={() => toggleOsaekomi('white')}
           disabled={state.phase === 'ended'}
@@ -230,7 +230,7 @@ function TournamentInner({
           score={state.scores.blue}
           osaekomiActive={state.osaekomi.side === 'blue'}
           osaekomiSec={state.osaekomi.side === 'blue' ? osaekomiSec : 0}
-          onAthleteChange={(a) => dispatch({ type: 'SCORE_ADD', side: 'blue', kind: 'shido', at: -1 }) /* placeholder */}
+          onAthleteChange={(a) => dispatch({ type: 'UPDATE_ATHLETE', side: 'blue', athlete: a, at: Date.now() })}
           onScore={(kind, delta) => score('blue', kind, delta)}
           onOsaekomiToggle={() => toggleOsaekomi('blue')}
           disabled={state.phase === 'ended'}

@@ -156,7 +156,7 @@ export function matchReducer(state: MatchState, event: MatchEvent): MatchState {
       const paused = state.clockRunning ? commitClock(state, event.nowMs) : state;
       return {
         ...paused,
-        osaekomi: { side: event.side, startedAtMs: event.nowMs, frozenSec: 0 },
+        osaekomi: { side: event.side, startedAtMs: event.nowMs, frozenSec: 0, wazariAwarded: false },
       };
     }
 
@@ -166,7 +166,7 @@ export function matchReducer(state: MatchState, event: MatchEvent): MatchState {
       const total = liveOsaekomiSec(state, event.nowMs);
       return {
         ...state,
-        osaekomi: { side: null, startedAtMs: null, frozenSec: 0 },
+        osaekomi: { side: null, startedAtMs: null, frozenSec: 0, wazariAwarded: false },
         // intentionally don't auto-restart main clock; operator decides
         clockRunning: false,
         clockAnchorMs: null,
@@ -219,7 +219,7 @@ export function matchReducer(state: MatchState, event: MatchEvent): MatchState {
         clockSec: state.rule.durationSec,
         clockRunning: false,
         clockAnchorMs: null,
-        osaekomi: { side: null, startedAtMs: null, frozenSec: 0 },
+        osaekomi: { side: null, startedAtMs: null, frozenSec: 0, wazariAwarded: false },
         result: null,
       };
     }
@@ -246,7 +246,7 @@ function endMatch(
     phase: 'ended',
     clockRunning: false,
     clockAnchorMs: null,
-    osaekomi: { side: null, startedAtMs: null, frozenSec: 0 },
+    osaekomi: { side: null, startedAtMs: null, frozenSec: 0, wazariAwarded: false },
     result: { winner, reason, endedAt: at },
   };
 }
@@ -273,7 +273,7 @@ export function createMatchState(args: {
     clockSec: args.rule.durationSec,
     clockRunning: false,
     clockAnchorMs: null,
-    osaekomi: { side: null, startedAtMs: null, frozenSec: 0 },
+    osaekomi: { side: null, startedAtMs: null, frozenSec: 0, wazariAwarded: false },
     result: null,
   };
 }

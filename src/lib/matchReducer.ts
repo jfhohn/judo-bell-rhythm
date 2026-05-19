@@ -176,13 +176,15 @@ export function matchReducer(state: MatchState, event: MatchEvent): MatchState {
     }
 
     case 'OSAEKOMI_AUTO_AWARD': {
-      // award and (if ippon) end match
       const next = matchReducer(state, {
         type: 'SCORE_ADD',
         side: event.side,
         kind: event.kind,
         at: event.at,
       });
+      if (event.kind === 'wazari' && next.osaekomi.side) {
+        return { ...next, osaekomi: { ...next.osaekomi, wazariAwarded: true } };
+      }
       return next;
     }
 

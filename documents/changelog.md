@@ -1,5 +1,26 @@
 # Changelog
 
+## [4.0.0] - 2026-05-19
+
+### Added
+- **Tournament Match Timer (Phase 1)**: Smoothcomp-style scoreboard at `/tournament` for mock matches
+  - Two athlete rows (White/Blue) with inline-editable name, country code, and club
+  - Per-athlete Ippon / Wazari / Shido with `+` and `−` buttons
+  - Per-athlete Osaekomi sub-timer with auto-Wazari at 10s and auto-Ippon at 20s (configurable)
+  - Yellow shido card visuals (3 = hansokumake)
+  - Main match clock with start/pause and ±1s / ±30s nudgers
+  - Golden Score mode (count-up clock, optional cap)
+  - End-game "Won by:" panel with Ippon / Wazari / Walkover / Hansokumake / No Show / Decision / Draw / Double WO-DQ / Double No Show
+  - Undo (event-log based), Switch Sides, Reset/New Match
+  - End-of-regulation and end-of-match buzzer (reuses existing audio system)
+- **Rule presets**: IJF Senior/Junior/Cadet/Veteran, USA Judo Bantam/Intermediate/Juvenile, plus fully custom
+- **New Match setup page** at `/tournament/setup` for choosing preset and overriding all timings
+- **Referee / Spectator display** at `/tournament/display` — read-only big-screen mirror synced via BroadcastChannel + localStorage, opens in a pop-out window
+- **Keyboard shortcuts**: Space (start/pause), Q/W/E (White scores), A/S/D (Blue scores), O/K (osaekomi), U (undo), X (switch), G (golden score), Enter (end match), ←/→ nudge, Shift = ±30s or remove score
+- "Tournament" navigation button in the class-bell header
+
+
+
 ## [3.0.4] - 2024-12-16
 
 ### Fixed

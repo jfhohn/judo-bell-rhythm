@@ -58,3 +58,43 @@ Judo instructors need to track multiple class sections (warmup, newaza, tachiwaz
 - Distance-optimized visibility
 - Zero-distraction operation
 - SVJ brand consistency
+
+---
+
+## Tournament Match Timer (Phase 1)
+
+### Problem
+Local judo tournaments pay exorbitant fees for industry-standard tournament software (Smoothcomp). Individual dojos also need a faithful Smoothcomp-style scoreboard for in-house mock matches, refereeing practice, and intra-dojo competition — without having to log into commercial tournament software.
+
+### Goal (Phase 1)
+Ship a free, browser-based scoreboard that any dojo can use for mock matches and unofficial events. Phase 2 will add tournament-organizer features (brackets, fightorder, mat assignments). Phase 1 deliberately scopes to a single-match operator console.
+
+### Users
+- **Operator / Instructor** — drives the scoreboard from a laptop/tablet using click + keyboard shortcuts.
+- **Referee / Spectators** — view the read-only big-screen mirror.
+
+### Routes
+- `/tournament` — operator console (default match loaded from IndexedDB)
+- `/tournament/setup` — choose preset + override timings + name athletes
+- `/tournament/display` — read-only spectator/referee view, synced via BroadcastChannel
+
+### Functional Requirements
+- Main match clock with start/pause and ±1s / ±30s manual nudgers
+- Per-athlete Ippon / Wazari / Shido add and remove
+- Osaekomi sub-timer (auto-Wazari and auto-Ippon at configurable thresholds)
+- Golden Score mode (count-up clock with optional cap)
+- End-of-match "Won by" reason picker (matches Smoothcomp's terminal-result grid)
+- Undo for every operator action; Switch Sides; New Match reset
+- End-of-regulation and end-of-match buzzer
+- Operator-only keyboard shortcuts with on-screen help
+
+### Rule Presets
+- **IJF**: Senior 4:00, Junior 4:00, Cadet 4:00, Veteran 3:00 — win on Ippon, 2× Wazari, or opponent reaches 3 Shido.
+- **USA Judo**: Bantam 2:00, Intermediate 3:00, Juvenile 3:00, plus IJF presets.
+- **Custom**: every duration and threshold editable per match.
+
+### Non-Goals (Phase 1)
+Brackets, fightorder, competitor database, mat assignments, registration, networked multi-mat sync, video review, official points export. Data shapes accommodate these for Phase 2.
+
+### Architecture
+Single pure `matchReducer(state, event)` drives every state change. The controller hook (`useMatchController`) owns the event/undo stack and runs a `requestAnimationFrame` loop while the clock or osaekomi is active. Live time is derived from `performance.now()` deltas so the displayed clock does not drift even when the tab is throttled. All persistence is local-first via IndexedDB and `BroadcastChannel` for spectator sync — no backend.

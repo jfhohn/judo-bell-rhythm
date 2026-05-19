@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { Settings, Volume2, VolumeX, Check } from 'lucide-react';
+import { Settings, Volume2, VolumeX, Check, Trophy } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Schedule, ScheduleGroup } from '@/lib/scheduleStore';
 import svjLogo from '@/assets/svj-logo.png';
@@ -67,6 +68,21 @@ export function Header({
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            to="/tournament"
+            className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-sm font-semibold uppercase tracking-wider transition-colors"
+            aria-label="Tournament timer"
+          >
+            <Trophy className="w-4 h-4 text-warning" />
+            Tournament
+          </Link>
+          <Link
+            to="/tournament"
+            className="md:hidden btn-icon"
+            aria-label="Tournament timer"
+          >
+            <Trophy className="w-5 h-5 text-warning" />
+          </Link>
           <button
             onClick={onMuteToggle}
             className="btn-icon"

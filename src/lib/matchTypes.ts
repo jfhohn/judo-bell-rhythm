@@ -53,6 +53,8 @@ export interface OsaekomiState {
   startedAtMs: number | null; // performance.now() anchor
   /** seconds already accumulated and frozen (e.g. after stop) */
   frozenSec: number;
+  /** wazari already auto-awarded for this hold (resets when a new hold starts) */
+  wazariAwarded: boolean;
 }
 
 export interface MatchState {

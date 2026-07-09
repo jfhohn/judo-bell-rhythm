@@ -74,12 +74,17 @@ export const SceneAuto: React.FC = () => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 140,
             boxShadow: `0 0 120px ${colors.primary}aa`,
           }}
         >
-          🔔
+          <svg width="140" height="140" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 3a1.5 1.5 0 0 0-1.5 1.5v.6A6 6 0 0 0 6 11v3.2l-1.7 2.2a1 1 0 0 0 .8 1.6h13.8a1 1 0 0 0 .8-1.6L18 14.2V11a6 6 0 0 0-4.5-5.9v-.6A1.5 1.5 0 0 0 12 3Zm-2 17a2 2 0 1 0 4 0h-4Z"
+              fill="#ffffff"
+            />
+          </svg>
         </div>
+
       </div>
 
       {/* Progress bar for current section */}

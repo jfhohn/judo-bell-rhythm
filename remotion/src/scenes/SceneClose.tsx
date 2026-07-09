@@ -8,7 +8,7 @@ export const SceneClose: React.FC = () => {
 
   const t1 = spring({ frame, fps, config: { damping: 200 } });
   const t2 = spring({ frame: frame - 22, fps, config: { damping: 14, stiffness: 90 } });
-  const t3 = spring({ frame: frame - 60, fps, config: { damping: 200 } });
+  const t3 = spring({ frame: frame - 40, fps, config: { damping: 200 } });
 
   const chips = [
     "Offline-first",
@@ -80,7 +80,7 @@ export const SceneClose: React.FC = () => {
         }}
       >
         {chips.map((c, i) => {
-          const chipIn = spring({ frame: frame - 60 - i * 5, fps, config: { damping: 200 } });
+          const chipIn = spring({ frame: frame - 40 - i * 5, fps, config: { damping: 200 } });
           return (
             <div
               key={c}
